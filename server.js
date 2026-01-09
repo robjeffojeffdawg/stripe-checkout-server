@@ -1,11 +1,12 @@
-require("dotenv").config();
-
 const express = require("express");
+const path = require("path");
 const app = express();
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 app.use(express.json());
-app.use(express.static("public"));
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+app.use(express.static(path.resolve(__dirname, "public")));
 
 app.post("/create-checkout-session", async (req, res) => {
   try {
@@ -79,11 +80,7 @@ app.post("/create-subscription-session", async (req, res) => {
   }
 });
 
-app.listen(4242, () => {
-  console.log("Server running on http://localhost:4242");
-});
 const PORT = process.env.PORT || 4242;
-
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

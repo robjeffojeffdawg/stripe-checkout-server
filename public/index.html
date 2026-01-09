@@ -1,113 +1,46 @@
+<!-- RENDER INDEX VERSION 1 -->
 <!DOCTYPE html>
-<html>
-  <body>
-    <h1>Choose a product</h1>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Stripe Checkout</title>
+</head>
+<body>
+  <h1>Choose a plan</h1>
 
-    <button onclick="pay('price_1SnDPfAG2360Iu0sB08qRFKW')">
-      Buy Basic ($5)
-    </button>
+  <button id="buy-basic">Buy Basic</button>
+  <br /><br />
+  <button id="buy-premium">Buy Premium</button>
 
-    <br /><br />
+  <script>
+    async function checkout(priceId) {
+      try {
+        const res = await fetch("/create-price-checkout-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ priceId }),
+        });
 
-    <button onclick="pay('price_1SnDPxAG2360Iu0sTUXRZpOv')">
-      Buy Premium ($25)
-    </button>
+        const data = await res.json();
 
-    <script>
-  async function pay(priceId) {
-    const res = await fetch("/create-price-checkout-session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ priceId }),
-    });
-
-    const data = await res.json();
-
-    if (data.url) {
-      window.location.href = data.url;
-    } else {
-      alert("Stripe error: " + data.error);
-      console.error(data.error);
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          alert(data.error || "Checkout failed");
+        }
+      } catch (err) {
+        alert("Network error");
+        console.error(err);
+      }
     }
-  }
-</script>
-<h2>Subscriptions</h2>
 
-<button onclick="subscribe('price_1SnDdUAG2360Iu0sQ4p7rF5v')">
-  Pro Monthly ($10/mo)
-</button>
-
-<br /><br />
-
-<button onclick="subscribe('price_1SnDduAG2360Iu0sEAYP7WAD')">
-  Pro Yearly ($100/yr)
-</button>
-
-<script>
-  async function subscribe(priceId) {
-    const res = await fetch("/create-subscription-session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ priceId }),
+    document.getElementById("buy-basic").addEventListener("click", () => {
+      checkout("price_1SnDPfAG2360Iu0sB08qRFKW");
     });
 
-    const data = await res.json();
-
-    if (data.url) {
-      window.location.href = data.url;
-    } else {
-      alert(data.error);
-    }
-  }
-</script>
-<h2>One-time purchase</h2>
-
-<select id="currency">
-  <option value="usd">USD</option>
-  <option value="gbp">GBP</option>
-  <option value="eur">EUR</option>
-  <option value="cny">CNY (RMB)</option>
-
-</select>
-
-<br /><br />
-
-<button onclick="pay('basic')">Buy Basic</button>
-<button onclick="pay('premium')">Buy Premium</button>
-
-<script>
-  const PRICE_MAP = {
-    basic: {
-      usd: "price_1SnDPfAG2360Iu0sB08qRFKW",
-      gbp: "price_1SnDqgAG2360Iu0shfbuWDo0",
-      eur: "price_1SnDr9AG2360Iu0suia5GL5Y",
-      cny: "price_1SnDxAAG2360Iu0seRarHoQb"
-
-    },
-    premium: {
-      usd: "price_1SnDPxAG2360Iu0sTUXRZpOv",
-      gbp: "price_1SnDrVAG2360Iu0sv0Rxl7QQ",
-      eur: "price_1SnDrkAG2360Iu0sBu8CvS7D",
-      cny: "price_1SnE0TAG2360Iu0swLAApkh0"
-
-    },
-  };
-
-  async function pay(product) {
-    const currency = document.getElementById("currency").value;
-    const priceId = PRICE_MAP[product][currency];
-
-    const res = await fetch("/create-price-checkout-session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ priceId }),
+    document.getElementById("buy-premium").addEventListener("click", () => {
+      checkout("price_1SnDPxAG2360Iu0sTUXRZpOv");
     });
-
-    const data = await res.json();
-    if (data.url) window.location.href = data.url;
-  }
-</script>
-
-
-  </body>
+  </script>
+</body>
 </html>
