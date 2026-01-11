@@ -1,21 +1,36 @@
-<!-- RENDER INDEX VERSION 1 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>Stripe Checkout</title>
+
+  <!-- ✅ Stripe.js MUST be loaded first -->
+  <script src="https://js.stripe.com/v3/"></script>
 </head>
+
 <body>
-  <h1>Choose a plan</h1>
+  <h1>Choose a product</h1>
 
-  <button id="buy-basic">Buy Basic</button>
+  <!-- ✅ Buttons call the function properly -->
+  <button onclick="pay('price_1SnDqgAG2360Iu0shfbuWDo0')">
+    Buy Basic
+  </button>
+
   <br /><br />
-  <button id="buy-premium">Buy Premium</button>
 
+  <button onclick="pay('price_1SnDrVAG2360Iu0sv0Rxl7QQ')">
+    Buy Premium
+  </button>
+
+  <!-- ✅ Stripe initialized AFTER Stripe.js -->
   <script>
-    async function checkout(priceId) {
+    const stripe = Stripe(
+      "pk_test_51HJeiVAG2360Iu0sR7j4nGRCh5X7EkXFzmuPw2REopZ4TXuFnl5JL984bfNK9gWlIoWp79nta3rmvPny2HUR55Ui00FL0fyUJG"
+    );
+
+    async function pay(priceId) {
       try {
-        const res = await fetch("/create-price-checkout-session", {
+        const res = await fetch("/create-checkout-session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ priceId }),
@@ -26,21 +41,13 @@
         if (data.url) {
           window.location.href = data.url;
         } else {
-          alert(data.error || "Checkout failed");
+          alert(data.error || "Session failed");
         }
       } catch (err) {
-        alert("Network error");
         console.error(err);
+        alert("Network error");
       }
     }
-
-    document.getElementById("buy-basic").addEventListener("click", () => {
-      checkout("price_1SnDPfAG2360Iu0sB08qRFKW");
-    });
-
-    document.getElementById("buy-premium").addEventListener("click", () => {
-      checkout("price_1SnDPxAG2360Iu0sTUXRZpOv");
-    });
   </script>
 </body>
 </html>
