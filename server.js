@@ -13,8 +13,8 @@ app.use(express.json());
 app.use(express.static("public"));
 
 const ALLOWED_PRICES = [
-  "price_1SnDqgAG2360Iu0shfbuWDo0", // Basic
-  "price_1SnDrVAG2360Iu0sv0Rxl7QQ", // Premium
+  "price_1SokWfAG2360Iu0s5hr6g5JH", // Basic
+  "price_1SokXdAG2360Iu0s7lZJWy3z", // Premium
 ];
 
 app.post("/create-checkout-session", async (req, res) => {
@@ -38,9 +38,9 @@ app.post("/create-checkout-session", async (req, res) => {
 
     res.json({ url: session.url });
   } catch (err) {
-    console.error("Stripe error:", err.message);
-    res.status(500).json({ error: "Stripe session failed" });
-  }
+  console.error("Stripe FULL error:", err);
+  res.status(500).json({ error: err.message });
+}
 });
 
  const PORT = process.env.PORT || 4242;

@@ -4,25 +4,20 @@
   <meta charset="UTF-8" />
   <title>Stripe Checkout</title>
 
-  <!-- ✅ Stripe.js MUST be loaded first -->
   <script src="https://js.stripe.com/v3/"></script>
 </head>
 
 <body>
   <h1>Choose a product</h1>
 
-  <!-- ✅ Buttons call the function properly -->
-  <button onclick="pay('price_1SoblbAG2360Iu0s7Cvu0Bpb')">
-    Buy Basic
-  </button>
+ <button onclick="pay('price_1SokWfAG2360Iu0s5hr6g5JH')">
+  Buy Basic
+</button>
 
-  <br /><br />
-
-  <button onclick="pay('price_1SobmIAG2360Iu0sIXqK0kcK')">
-    Buy Premium
-  </button>
-
-  <!-- ✅ Stripe initialized AFTER Stripe.js -->
+<button onclick="pay('price_1SokXdAG2360Iu0s7lZJWy3z')">
+  Buy Premium
+</button>
+   
   <script>
     const stripe = Stripe(
       "pk_test_51HJeiVAG2360Iu0sR7j4nGRCh5X7EkXFzmuPw2REopZ4TXuFnl5JL984bfNK9gWlIoWp79nta3rmvPny2HUR55Ui00FL0fyUJG"
@@ -30,15 +25,18 @@
 
     async function pay(priceId) {
       try {
-        fetch("https://your-backend.onrender.com/create-checkout-session", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ priceId }),
-        });
+    const res = await fetch(
+      "https://stripe-checkout-server-4w4i.onrender.com/create-checkout-session",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priceId }),
+      }
+    );
 
-        const data = await res.json();
+    const data = await res.json();
 
-        if (data.url) {
+    if (data.url) {
           window.location.href = data.url;
         } else {
           alert(data.error);
