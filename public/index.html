@@ -12,13 +12,13 @@
   <h1>Choose a product</h1>
 
   <!-- ✅ Buttons call the function properly -->
-  <button onclick="pay('price_1SnDqgAG2360Iu0shfbuWDo0')">
+  <button onclick="pay('price_1SoblbAG2360Iu0s7Cvu0Bpb')">
     Buy Basic
   </button>
 
   <br /><br />
 
-  <button onclick="pay('price_1SnDrVAG2360Iu0sv0Rxl7QQ')">
+  <button onclick="pay('price_1SobmIAG2360Iu0sIXqK0kcK')">
     Buy Premium
   </button>
 
@@ -30,7 +30,7 @@
 
     async function pay(priceId) {
       try {
-        const res = await fetch("/create-checkout-session", {
+        fetch("https://your-backend.onrender.com/create-checkout-session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ priceId }),
@@ -41,7 +41,7 @@
         if (data.url) {
           window.location.href = data.url;
         } else {
-          alert(data.error || "Session failed");
+          alert(data.error);
         }
       } catch (err) {
         console.error(err);
