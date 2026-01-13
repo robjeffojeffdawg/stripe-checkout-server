@@ -146,6 +146,7 @@ app.get("/access", (req, res) => {
   data.used = true;
 
   res.sendFile(path.join(__dirname, "public", "product.html"));
+  }); 
 
 const PORT = process.env.PORT || 4242;
 
