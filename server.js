@@ -7,6 +7,7 @@ const app = express();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 const accessTokens = new Map();
+const TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 
 app.use(
   "/webhook",
@@ -87,19 +88,20 @@ app.post("/webhook",
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object;
+if (event.type === "checkout.session.completed") {
+  const session = event.data.object;
 
-    const token = crypto.randomBytes(32).toString("hex");
+  const token = crypto.randomBytes(32).toString("hex");
 
-    accessTokens.set(token, {
-      createdAt: Date.now(),
-      used: false,
-      sessionId: session.id,
-    });
+  accessTokens.set(token, {
+    createdAt: Date.now(),
+    expiresAt: Date.now() + TOKEN_TTL_MS,
+    used: false,
+    sessionId: session.id,
+  });
 
-    console.log("✅ Access token created:", token);
-  }
+  console.log("✅ Access token created:", token);
+}
 
   res.json({ received: true });
 });
@@ -131,6 +133,11 @@ app.get("/access", (req, res) => {
   }
 
   const data = accessTokens.get(token);
+  
+  if (Date.now() > data.expiresAt) {
+    accessTokens.delete(token);
+    return res.status(403).send("❌ This access link has expired");
+     }
 
   if (data.used) {
     return res.status(403).send("❌ This access link has already been used");
@@ -139,7 +146,6 @@ app.get("/access", (req, res) => {
   data.used = true;
 
   res.sendFile(path.join(__dirname, "public", "product.html"));
-});
 
 const PORT = process.env.PORT || 4242;
 
