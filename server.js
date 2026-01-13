@@ -103,6 +103,40 @@ app.post("/webhook",
 
   res.json({ received: true });
 });
+app.get("/get-access-link", (req, res) => {
+  const { session_id } = req.query;
+
+  if (!session_id) {
+    return res.status(400).json({ error: "Missing session_id" });
+  }
+
+  for (const [token, data] of accessTokens.entries()) {
+    if (data.sessionId === session_id && !data.used) {
+      return res.json({
+        accessUrl: `${process.env.BASE_URL}/access?token=${token}`,
+      });
+    }
+  }
+
+  res.status(404).json({ error: "Access token not found" });
+
+  app.get("/access", (req, res) => {
+  const { token } = req.query;
+
+  if (!token || !accessTokens.has(token)) {
+    return res.status(403).send("❌ Invalid or expired access link");
+  }
+
+  const data = accessTokens.get(token);
+
+  if (data.used) {
+    return res.status(403).send("❌ This access link has already been used");
+  }
+
+  data.used = true;
+
+  res.send("✅ Access granted. Welcome to the product.");
+});
 
 const PORT = process.env.PORT || 4242;
 
