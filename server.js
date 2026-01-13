@@ -1,9 +1,12 @@
 require("dotenv").config();
 const express = require("express");
 const Stripe = require("stripe");
+const crypto = require("crypto");
 
 const app = express();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+const accessTokens = new Map();
 
 app.use(
   "/webhook",
@@ -37,7 +40,7 @@ app.post("/create-checkout-session", async (req, res) => {
     const session = await stripe.checkout.sessions.create({
       mode: "subscription", 
      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${process.env.BASE_URL}/success.html`,
+      success_url: `${process.env.BASE_URL}/success.html?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.BASE_URL}/cancel.html`,
     });
 
@@ -66,7 +69,9 @@ app.get("/checkout-session", async (req, res) => {
   }
 });
 
-app.post("/webhook", (req, res) => {
+app.post("/webhook",  
+  express.raw({ type: "application/json" }),
+  (req, res) => {
   const sig = req.headers["stripe-signature"];
 
   let event;
@@ -81,16 +86,26 @@ app.post("/webhook", (req, res) => {
     console.error("Webhook signature verification failed.", err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
+
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
 
-    console.log("✅ Payment confirmed for session:", session.id);
+    const token = crypto.randomBytes(32).toString("hex");
+
+    accessTokens.set(token, {
+      createdAt: Date.now(),
+      used: false,
+      sessionId: session.id,
+    });
+
+    console.log("✅ Access token created:", token);
   }
 
   res.json({ received: true });
 });
 
- const PORT = process.env.PORT || 4242;
+const PORT = process.env.PORT || 4242;
+
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
