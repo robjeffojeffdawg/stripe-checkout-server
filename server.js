@@ -119,8 +119,9 @@ app.get("/get-access-link", (req, res) => {
   }
 
   res.status(404).json({ error: "Access token not found" });
+});
 
-  app.get("/access", (req, res) => {
+app.get("/access", (req, res) => {
   const { token } = req.query;
 
   if (!token || !accessTokens.has(token)) {
