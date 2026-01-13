@@ -7,7 +7,8 @@ const app = express();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 const accessTokens = new Map();
-const TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; 
+const MAX_TOKEN_USES = 5;
 
 app.use(
   "/webhook",
@@ -93,12 +94,12 @@ if (event.type === "checkout.session.completed") {
 
   const token = crypto.randomBytes(32).toString("hex");
 
-  accessTokens.set(token, {
-    createdAt: Date.now(),
-    expiresAt: Date.now() + TOKEN_TTL_MS,
-    used: false,
-    sessionId: session.id,
-  });
+accessTokens.set(token, {
+  createdAt: Date.now(),
+  expiresAt: Date.now() + TOKEN_TTL_MS,
+  uses: 0,
+  sessionId: session.id,
+});
 
   console.log("✅ Access token created:", token);
 }
@@ -138,12 +139,12 @@ app.get("/access", (req, res) => {
     accessTokens.delete(token);
     return res.status(403).send("❌ This access link has expired");
      }
-
-  if (data.used) {
-    return res.status(403).send("❌ This access link has already been used");
+  
+     if (data.uses >= MAX_TOKEN_USES) {
+    return res.status(403).send("❌ This access link has reached its usage limit");
   }
 
-  data.used = true;
+  data.uses += 1;
 
   res.sendFile(path.join(__dirname, "public", "product.html"));
   }); 
