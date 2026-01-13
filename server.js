@@ -121,6 +121,8 @@ app.get("/get-access-link", (req, res) => {
   res.status(404).json({ error: "Access token not found" });
 });
 
+const path = require("path");
+
 app.get("/access", (req, res) => {
   const { token } = req.query;
 
@@ -136,7 +138,7 @@ app.get("/access", (req, res) => {
 
   data.used = true;
 
-  res.send("✅ Access granted. Welcome to the product.");
+  res.sendFile(path.join(__dirname, "public", "product.html"));
 });
 
 const PORT = process.env.PORT || 4242;
