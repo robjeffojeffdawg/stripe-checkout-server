@@ -5,6 +5,11 @@ const Stripe = require("stripe");
 const app = express();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+app.use(
+  "/webhook",
+  express.raw({ type: "application/json" })
+);
+
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
@@ -41,6 +46,48 @@ app.post("/create-checkout-session", async (req, res) => {
   console.error("Stripe FULL error:", err);
   res.status(500).json({ error: err.message });
 }
+});
+
+app.get("/checkout-session", async (req, res) => {
+  const { session_id } = req.query;
+
+  if (!session_id) {
+    return res.status(400).json({ error: "Missing session_id" });
+  } try {
+    const session = await stripe.checkout.sessions.retrieve(session_id);
+
+    res.json({
+      status: session.payment_status,
+      customer_email: session.customer_details?.email,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Unable to retrieve session" });
+  }
+});
+
+app.post("/webhook", (req, res) => {
+  const sig = req.headers["stripe-signature"];
+
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch (err) {
+    console.error("Webhook signature verification failed.", err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object;
+
+    console.log("✅ Payment confirmed for session:", session.id);
+  }
+
+  res.json({ received: true });
 });
 
  const PORT = process.env.PORT || 4242;

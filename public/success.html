@@ -1,7 +1,39 @@
 <!DOCTYPE html>
 <html>
+  <head>
+    <title>Payment Successful</title>
+  </head>
   <body>
-    <h1>Payment Successful 🎉</h1>
-    <a href="index.html">Return to Shop</a>
+    <h1>Thanks for your purchase 🎉</h1>
+    <p id="status">Verifying your payment…</p>
+
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const sessionId = params.get("session_id");
+
+      if (!sessionId) {
+        document.getElementById("status").innerText =
+          "Missing session information.";
+      } else {
+        fetch(
+          `https://stripe-checkout-server-4w4i.onrender.com/checkout-session?session_id=${sessionId}`
+        )
+          .then(res => res.json())
+          .then(data => {
+            if (data.status === "paid") {
+              document.getElementById("status").innerText =
+                "Payment confirmed. You now have access.";
+            } else {
+              document.getElementById("status").innerText =
+                "Payment pending. Please refresh in a moment.";
+            }
+          })
+          .catch(() => {
+            document.getElementById("status").innerText =
+              "Error verifying payment.";
+          });
+      }
+    </script>
   </body>
 </html>
+
