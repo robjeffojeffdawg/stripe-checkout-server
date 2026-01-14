@@ -6,7 +6,6 @@ const crypto = require("crypto");
 const app = express();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-const accessTokens = new Map();
 const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; 
 const MAX_TOKEN_USES = 5;
 
@@ -73,7 +72,7 @@ app.get("/checkout-session", async (req, res) => {
 
 app.post("/webhook",  
   express.raw({ type: "application/json" }),
-  (req, res) => {
+  async (req, res) => {
   const sig = req.headers["stripe-signature"];
 
   let event;
@@ -91,17 +90,17 @@ app.post("/webhook",
 
 if (event.type === "checkout.session.completed") {
   const session = event.data.object;
+const token = crypto.randomBytes(32).toString("hex");
 
-  const token = crypto.randomBytes(32).toString("hex");
+const pool = require("./db");
 
-accessTokens.set(token, {
-  createdAt: Date.now(),
-  expiresAt: Date.now() + TOKEN_TTL_MS,
-  uses: 0,
-  sessionId: session.id,
-});
+ await pool.query(
+    `INSERT INTO access_tokens (token, session_id)
+     VALUES ($1, $2)`,
+    [token, session.id]
+  );
 
-  console.log("✅ Access token created:", token);
+  console.log("✅ Access token stored in DB:", token);
 }
 
   res.json({ received: true });
@@ -126,29 +125,35 @@ app.get("/get-access-link", (req, res) => {
 
 const path = require("path");
 
-app.get("/access", (req, res) => {
+app.get("/access", async (req, res) => {
   const { token } = req.query;
 
-  if (!token || !accessTokens.has(token)) {
+   if (!token) {
+    return res.status(400).send("❌ Missing access token");
+  }
+
+  const result = await pool.query(
+    `SELECT * FROM access_tokens WHERE token = $1`,
+    [token]
+  );
+
+  if (result.rows.length === 0) {
     return res.status(403).send("❌ Invalid or expired access link");
   }
 
-  const data = accessTokens.get(token);
-  
-  if (Date.now() > data.expiresAt) {
-    accessTokens.delete(token);
-    return res.status(403).send("❌ This access link has expired");
-     }
-  
-     if (data.uses >= MAX_TOKEN_USES) {
-    return res.status(403).send("❌ This access link has reached its usage limit");
+  const access = result.rows[0];
+
+  if (access.used) {
+    return res.status(403).send("❌ This access link has already been used");
   }
 
-  data.uses += 1;
+  await pool.query(
+    `UPDATE access_tokens SET used = true WHERE token = $1`,
+    [token]
+  );
 
-  res.sendFile(path.join(__dirname, "public", "product.html"));
-  }); 
-
+  res.send("✅ Access granted. Welcome to the product.");
+});
 const PORT = process.env.PORT || 4242;
 
 app.listen(PORT, "0.0.0.0", () => {
