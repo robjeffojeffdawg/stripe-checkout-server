@@ -125,7 +125,7 @@ app.get("/get-access-link", (req, res) => {
 
 const path = require("path");
 
-app.get("/access", async (req, res) => {
+app.get("/access", (req, res) => {
   const { token } = req.query;
 
    if (!token) {
