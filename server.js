@@ -135,7 +135,8 @@ app.get("/access", async (req, res) => {
     [token]
   );
 
-  res.send("✅ Access granted. Welcome to the product.");
+res.sendFile("access.html", { root: "public" });
+
 });
 const PORT = process.env.PORT || 4242;
 
