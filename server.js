@@ -82,15 +82,16 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
       process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (err) {
+     console.error("❌ Webhook signature failed:", err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
   if (event.type === "checkout.session.completed") {
-    // Deduplicate
     const seen = await pool.query(
       "SELECT 1 FROM stripe_events WHERE id = $1",
       [event.id]
     );
+
     if (seen.rowCount > 0) return res.json({ received: true });
 
     await pool.query(
@@ -98,31 +99,29 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
       [event.id]
     );
 
-    // Validate purchase
     const session = event.data.object;
     const subscription = await stripe.subscriptions.retrieve(
       session.subscription
     );
 
-    const priceId = subscription.items.data[0].price.id;
-    if (!ALLOWED_PRICES.includes(priceId)) {
-      return res.json({ received: true });
-    }
+     const priceId = subscription.items.data[0].price.id;
+      if (!ALLOWED_PRICES.includes(priceId)) {
+        return res.json({ received: true });
+      }
 
     const token = crypto.randomBytes(32).toString("hex");
     await pool.query(
       "INSERT INTO access_tokens (token, session_id) VALUES ($1, $2)",
       [token, session.id]
     );
-
-app.use(express.json());
-app.use(express.static("public"));
-
-    console.log("✅ Access token stored in DB:", token);
+console.log("✅ Access token stored:", token);
   }
 
   res.json({ received: true });
 });
+
+app.use(express.json());
+app.use(express.static("public"));
 
 app.get("/access", async (req, res) => {
   const { token } = req.query;
