@@ -138,6 +138,27 @@ app.get("/access", async (req, res) => {
   );
 
   res.send("✅ Access granted. Welcome to the product.");
+
+  app.get("/redirect-after-success", async (req, res) => {
+  const { session_id } = req.query;
+
+  if (!session_id) {
+    return res.status(400).send("Missing session ID");
+  }
+
+  const result = await pool.query(
+    `SELECT token FROM access_tokens WHERE session_id = $1`,
+    [session_id]
+  );
+
+  if (result.rows.length === 0) {
+    return res.status(404).send("Access link not found");
+  }
+
+  const { token } = result.rows[0];
+
+  res.redirect(`/access?token=${token}`);
+});
 });
 const PORT = process.env.PORT || 4242;
 

@@ -6,12 +6,17 @@
 </head>
 <body>
   <h1>Thanks for your purchase 🎉</h1>
-  <p>Your payment was successful.</p>
-  <p>
-    You will receive your access link shortly.
-    If you already have it, you can open it directly.
-  </p>
+  <p>Redirecting you to your access…</p>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get("session_id");
+
+    if (sessionId) {
+      window.location.href = `/redirect-after-success?session_id=${sessionId}`;
+    } else {
+      document.body.innerHTML += "<p>Missing session information.</p>";
+    }
+  </script>
 </body>
 </html>
-
-
