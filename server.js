@@ -26,50 +26,6 @@ const ALLOWED_PRICES = [
   "price_1SokXdAG2360Iu0s7lZJWy3z", // Premium
 ];
 
-app.post("/create-checkout-session", async (req, res) => {
-  try {
-    const { priceId } = req.body;
-
-    if (!priceId) {
-      return res.status(400).json({ error: "Missing priceId" });
-    }
-
-    if (!ALLOWED_PRICES.includes(priceId)) {
-      return res.status(400).json({ error: "Invalid priceId" });
-    }
-
-    const session = await stripe.checkout.sessions.create({
-      mode: "subscription", 
-     line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${process.env.BASE_URL}/success.html?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.BASE_URL}/cancel.html`,
-    });
-
-    res.json({ url: session.url });
-  } catch (err) {
-  console.error("Stripe FULL error:", err);
-  res.status(500).json({ error: err.message });
-}
-});
-
-app.get("/checkout-session", async (req, res) => {
-  const { session_id } = req.query;
-
-  if (!session_id) {
-    return res.status(400).json({ error: "Missing session_id" });
-  } try {
-    const session = await stripe.checkout.sessions.retrieve(session_id);
-
-    res.json({
-      status: session.payment_status,
-      customer_email: session.customer_details?.email,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Unable to retrieve session" });
-  }
-});
-
 app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
   const sig = req.headers["stripe-signature"];
   if (!sig) return res.status(400).send("Missing signature");
@@ -114,7 +70,8 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
       "INSERT INTO access_tokens (token, session_id) VALUES ($1, $2)",
       [token, session.id]
     );
-console.log("✅ Access token stored:", token);
+
+    console.log("✅ Access token stored:", token);
   }
 
   res.json({ received: true });
@@ -122,6 +79,51 @@ console.log("✅ Access token stored:", token);
 
 app.use(express.json());
 app.use(express.static("public"));
+
+app.post("/create-checkout-session", async (req, res) => {
+  try {
+    const { priceId } = req.body;
+
+    if (!priceId) {
+      return res.status(400).json({ error: "Missing priceId" });
+    }
+
+    if (!ALLOWED_PRICES.includes(priceId)) {
+      return res.status(400).json({ error: "Invalid priceId" });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription", 
+     line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${process.env.BASE_URL}/success.html?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.BASE_URL}/cancel.html`,
+    });
+
+    res.json({ url: session.url });
+  } catch (err) {
+  console.error("Stripe FULL error:", err);
+  res.status(500).json({ error: err.message });
+}
+});
+
+app.get("/checkout-session", async (req, res) => {
+  const { session_id } = req.query;
+
+  if (!session_id) {
+    return res.status(400).json({ error: "Missing session_id" });
+  } try {
+    const session = await stripe.checkout.sessions.retrieve(session_id);
+
+    res.json({
+      status: session.payment_status,
+      customer_email: session.customer_details?.email,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Unable to retrieve session" });
+  }
+});
+
 
 app.get("/access", async (req, res) => {
   const { token } = req.query;
