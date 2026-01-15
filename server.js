@@ -5,6 +5,12 @@ const crypto = require("crypto");
 
 const app = express();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+if (
+  process.env.STRIPE_SECRET_KEY.includes("test") &&
+  process.env.STRIPE_WEBHOOK_SECRET.includes("live")
+) {
+  throw new Error("Stripe keys mismatch: test + live");
+}
 
 const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; 
 const MAX_TOKEN_USES = 5;
@@ -67,13 +73,11 @@ app.get("/checkout-session", async (req, res) => {
   }
 });
 
-app.post("/webhook",  
-  express.raw({ type: "application/json" }),
-  async (req, res) => {
+app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
   const sig = req.headers["stripe-signature"];
+  if (!sig) return res.status(400).send("Missing signature");
 
   let event;
-
   try {
     event = stripe.webhooks.constructEvent(
       req.body,
@@ -81,22 +85,41 @@ app.post("/webhook",
       process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (err) {
-    console.error("Webhook signature verification failed.", err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-if (event.type === "checkout.session.completed") {
-  const session = event.data.object;
-const token = crypto.randomBytes(32).toString("hex");
+  if (event.type === "checkout.session.completed") {
+    // Deduplicate
+    const seen = await pool.query(
+      "SELECT 1 FROM stripe_events WHERE id = $1",
+      [event.id]
+    );
+    if (seen.rowCount > 0) return res.json({ received: true });
 
- await pool.query(
-    `INSERT INTO access_tokens (token, session_id)
-     VALUES ($1, $2)`,
-    [token, session.id]
-  );
+    await pool.query(
+      "INSERT INTO stripe_events (id) VALUES ($1)",
+      [event.id]
+    );
 
-  console.log("✅ Access token stored in DB:", token);
-}
+    // Validate purchase
+    const session = event.data.object;
+    const subscription = await stripe.subscriptions.retrieve(
+      session.subscription
+    );
+
+    const priceId = subscription.items.data[0].price.id;
+    if (!ALLOWED_PRICES.includes(priceId)) {
+      return res.json({ received: true });
+    }
+
+    const token = crypto.randomBytes(32).toString("hex");
+    await pool.query(
+      "INSERT INTO access_tokens (token, session_id) VALUES ($1, $2)",
+      [token, session.id]
+    );
+
+    console.log("✅ Access token stored in DB:", token);
+  }
 
   res.json({ received: true });
 });
