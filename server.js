@@ -11,11 +11,6 @@ const MAX_TOKEN_USES = 5;
 
 const pool = require("./db");
 
-app.use(
-  "/webhook",
-  express.raw({ type: "application/json" })
-);
-
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
@@ -105,12 +100,6 @@ const token = crypto.randomBytes(32).toString("hex");
 
   res.json({ received: true });
 });
-
-const path = require("path");
-
-res.sendFile(
-  path.join(__dirname, "public", "product.html")
-);
 
 app.get("/access", async (req, res) => {
   const { token } = req.query;
