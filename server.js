@@ -108,6 +108,10 @@ const token = crypto.randomBytes(32).toString("hex");
 
 const path = require("path");
 
+res.sendFile(
+  path.join(__dirname, "public", "product.html")
+);
+
 app.get("/access", async (req, res) => {
   const { token } = req.query;
 
@@ -126,17 +130,17 @@ app.get("/access", async (req, res) => {
 
   const access = result.rows[0];
 
-  if (access.used) {
-    return res.status(403).send("❌ This access link has already been used");
-  }
+if (access.used >= access.max_uses) {
+  return res.status(403).send("❌ Usage limit reached");
+}
+await pool.query(
+  `UPDATE access_tokens SET used = used + 1 WHERE token = $1`,
+  [token]
+);
 
-  await pool.query(
-    `UPDATE access_tokens SET used = true WHERE token = $1`,
-    [token]
-  );
-
-res.sendFile("access.html", { root: "public" });
-
+res.sendFile(
+  path.join(__dirname, "public", "product.html")
+);
 });
 const PORT = process.env.PORT || 4242;
 
