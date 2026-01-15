@@ -1,38 +1,17 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <title>Payment Successful</title>
-  </head>
-  <body>
-    <h1>Thanks for your purchase 🎉</h1>
-    <p id="status">Verifying your payment…</p>
-
-    <script>
-  const params = new URLSearchParams(window.location.search);
-  const sessionId = params.get("session_id");
-
-  if (!sessionId) {
-    document.body.innerHTML += "<p>Missing session information.</p>";
-  } else {
-    fetch(`/get-access-link?session_id=${sessionId}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.accessUrl) {
-          document.body.innerHTML += `
-            <p>🎉 Payment confirmed!</p>
-            <p>Copy this link and share it:</p>
-            <input type="text" value="${data.accessUrl}" readonly style="width: 100%;" />
-          `;
-        } else {
-          document.body.innerHTML += "<p>Access link not found.</p>";
-        }
-      })
-      .catch(() => {
-        document.body.innerHTML += "<p>Error fetching access link.</p>";
-      });
-  }
-</script>
-
-  </body>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Payment Successful</title>
+</head>
+<body>
+  <h1>Thanks for your purchase 🎉</h1>
+  <p>Your payment was successful.</p>
+  <p>
+    You will receive your access link shortly.
+    If you already have it, you can open it directly.
+  </p>
+</body>
 </html>
+
 
