@@ -9,6 +9,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; 
 const MAX_TOKEN_USES = 5;
 
+const pool = require("./db");
+
 app.use(
   "/webhook",
   express.raw({ type: "application/json" })
@@ -92,8 +94,6 @@ if (event.type === "checkout.session.completed") {
   const session = event.data.object;
 const token = crypto.randomBytes(32).toString("hex");
 
-const pool = require("./db");
-
  await pool.query(
     `INSERT INTO access_tokens (token, session_id)
      VALUES ($1, $2)`,
@@ -104,8 +104,6 @@ const pool = require("./db");
 }
 
   res.json({ received: true });
-
-  res.status(404).json({ error: "Access token not found" });
 });
 
 const path = require("path");
@@ -138,6 +136,9 @@ app.get("/access", async (req, res) => {
   );
 
   res.send("✅ Access granted. Welcome to the product.");
+});
+const PORT = process.env.PORT || 4242;
+
 
   app.get("/redirect-after-success", async (req, res) => {
   const { session_id } = req.query;
@@ -159,8 +160,6 @@ app.get("/access", async (req, res) => {
 
   res.redirect(`/access?token=${token}`);
 });
-});
-const PORT = process.env.PORT || 4242;
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Server running on port ${PORT}`);
