@@ -41,8 +41,7 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
      console.error("❌ Webhook signature failed:", err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
-
-  if (event.type === "checkout.session.completed") {
+ if (event.type === "checkout.session.completed") {
     const seen = await pool.query(
       "SELECT 1 FROM stripe_events WHERE id = $1",
       [event.id]
@@ -128,7 +127,10 @@ app.get("/checkout-session", async (req, res) => {
 app.get("/access", async (req, res) => {
   const { token } = req.query;
 
-   if (!token) {
+  if (access.email && access.email !== req.query.email) {
+  return res.status(403).send("❌ This link is tied to another email");
+}
+  if (!token) {
     return res.status(400).send("❌ Missing access token");
   }
 
@@ -142,6 +144,13 @@ app.get("/access", async (req, res) => {
   }
 
   const access = result.rows[0];
+
+  const expired =
+  Date.now() - new Date(access.created_at).getTime() > TOKEN_TTL_MS;
+
+if (expired) {
+  return res.status(403).send("❌ Access link expired");
+}
 
 if (access.used >= access.max_uses) {
   return res.status(403).send("❌ Usage limit reached");
@@ -173,8 +182,7 @@ const PORT = process.env.PORT || 4242;
   if (result.rows.length === 0) {
     return res.status(404).send("Access link not found");
   }
-
-  const { token } = result.rows[0];
+const { token } = result.rows[0];
 
   res.redirect(`/access?token=${token}`);
 });
