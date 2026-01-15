@@ -1,34 +1,35 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8" />
-  <title>Payment Successful</title>
-</head>
-<body>
-  <h1>Thanks for your purchase 🎉</h1>
-  <p>Verifying your payment…</p>
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const sessionId = params.get("session_id");
 
-  <script>
-    const params = new URLSearchParams(window.location.search);
-    const sessionId = params.get("session_id");
+  let attempts = 0;
+  const MAX_ATTEMPTS = 10;
 
-    if (!sessionId) {
-      document.body.innerHTML = "<p>Missing session information.</p>";
-      throw new Error("No session_id");
+  async function tryRedirect() {
+    try {
+      const res = await fetch(
+        `/redirect-after-success?session_id=${sessionId}`
+      );
+
+      if (res.redirected) {
+        window.location.href = res.url;
+        return;
+      }
+
+      throw new Error("Not ready");
+    } catch {
+      attempts++;
+      if (attempts >= MAX_ATTEMPTS) {
+        document.body.innerHTML = `
+          <p>Your payment was successful.<br>
+          Your access link will be available shortly.</p>
+        `;
+        return;
+      }
+
+      setTimeout(tryRedirect, 1500);
     }
+  }
 
-    fetch(`/redirect-after-success?session_id=${sessionId}`)
-      .then(res => {
-        if (!res.ok) throw new Error("Access link not found");
-        return res.text();
-      })
-      .then(() => {
-        // backend will redirect automatically
-      })
-      .catch(() => {
-        document.body.innerHTML =
-          "<p>Your payment was successful.<br>You will receive your access link shortly.</p>";
-      });
-  </script>
-</body>
-</html>
+  tryRedirect();
+</script>
