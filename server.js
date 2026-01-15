@@ -21,9 +21,6 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-app.use(express.json());
-app.use(express.static("public"));
-
 const ALLOWED_PRICES = [
   "price_1SokWfAG2360Iu0s5hr6g5JH", // Basic
   "price_1SokXdAG2360Iu0s7lZJWy3z", // Premium
@@ -117,6 +114,9 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
       "INSERT INTO access_tokens (token, session_id) VALUES ($1, $2)",
       [token, session.id]
     );
+
+app.use(express.json());
+app.use(express.static("public"));
 
     console.log("✅ Access token stored in DB:", token);
   }
