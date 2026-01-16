@@ -1,35 +1,22 @@
-<script>
-  const params = new URLSearchParams(window.location.search);
-  const sessionId = params.get("session_id");
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Payment successful</title>
+  </head>
+  <body>
+    <p>Payment successful. Redirecting…</p>
 
-  let attempts = 0;
-  const MAX_ATTEMPTS = 10;
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const sessionId = params.get("session_id");
 
-  async function tryRedirect() {
-    try {
-      const res = await fetch(
-        `/redirect-after-success?session_id=${sessionId}`
-      );
-
-      if (res.redirected) {
-        window.location.href = res.url;
-        return;
+      if (!sessionId) {
+        document.body.innerText = "Missing session ID.";
+      } else {
+        window.location.href = `/redirect-after-success?session_id=${sessionId}`;
       }
+    </script>
+  </body>
+</html>
 
-      throw new Error("Not ready");
-    } catch {
-      attempts++;
-      if (attempts >= MAX_ATTEMPTS) {
-        document.body.innerHTML = `
-          <p>Your payment was successful.<br>
-          Your access link will be available shortly.</p>
-        `;
-        return;
-      }
-
-      setTimeout(tryRedirect, 1500);
-    }
-  }
-
-  tryRedirect();
-</script>

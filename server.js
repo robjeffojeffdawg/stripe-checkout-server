@@ -127,6 +127,11 @@ app.get("/checkout-session", async (req, res) => {
 app.get("/access", async (req, res) => {
   const { token } = req.query;
 
+  await pool.query(
+  `DELETE FROM access_tokens
+   WHERE created_at < NOW() - INTERVAL '7 days'`
+);
+
   if (access.email && access.email !== req.query.email) {
   return res.status(403).send("❌ This link is tied to another email");
 }
