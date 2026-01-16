@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const Stripe = require("stripe");
 const crypto = require("crypto");
+const path = require("path");
 
 const pool = require("./db");
 pool.query("SELECT 1")
@@ -16,9 +17,6 @@ if (
 ) {
   throw new Error("Stripe keys mismatch: test + live");
 }
-
-const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; 
-const MAX_TOKEN_USES = 5;
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
@@ -62,16 +60,10 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
       session.subscription
     );
 
-     const priceId = subscription.items.data[0].price.id;
+    const priceId = subscription.items.data[0].price.id;
       if (!ALLOWED_PRICES.includes(priceId)) {
         return res.json({ received: true });
       }
-
-    const token = crypto.randomBytes(32).toString("hex");
-    await pool.query(
-      "INSERT INTO access_tokens (token, session_id) VALUES ($1, $2)",
-      [token, session.id]
-    );
 
     console.log("✅ Access token stored:", token);
   }
@@ -116,12 +108,14 @@ try {
 }
 });
 
-app.get("/checkout-session", async (req, res) => {
+app.get("/session-status", async (req, res) => {
   const { session_id } = req.query;
 
   if (!session_id) {
     return res.status(400).json({ error: "Missing session_id" });
-  } try {
+  }
+
+  try {
     const session = await stripe.checkout.sessions.retrieve(session_id);
 
     res.json({
@@ -184,11 +178,9 @@ const PORT = process.env.PORT || 4242;
     [session_id]
   );
 
-  if (result.rows.length === 0) {
-    return res.status(404).send("Access link not found");
-      if (result.rowCount === 0) {
-  }
-  }
+ if (result.rowCount === 0) {
+  return res.status(404).send("Access link not found");
+}
 const { token } = result.rows[0];
 
   res.redirect(`/access?token=${token}`);
