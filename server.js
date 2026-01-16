@@ -1,4 +1,5 @@
 require("dotenv").config();
+
 const express = require("express");
 const Stripe = require("stripe");
 const crypto = require("crypto");
@@ -19,6 +20,9 @@ if (
 ) {
   throw new Error("Stripe keys mismatch: test + live");
 }
+
+const PORT = process.env.PORT || 10000;
+
 const ALLOWED_PRICES = [
   "price_1SokWfAG2360Iu0s5hr6g5JH", // Basic
   "price_1SokXdAG2360Iu0s7lZJWy3z", // Premium
@@ -30,6 +34,7 @@ app.get("/health", (req, res) => {
 
 app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
   const sig = req.headers["stripe-signature"];
+  
   if (!sig) return res.status(400).send("Missing signature");
 
   let event;
@@ -39,33 +44,14 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
       sig,
       process.env.STRIPE_WEBHOOK_SECRET
     );
+
+     res.json({ received: true });
   } catch (err) {
-     console.error("❌ Webhook signature failed:", err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+     console.error("❌ Webhook verification failed:", err.message);
+    res.status(400).send(`Webhook Error: ${err.message}`);
+    }
   }
- if (event.type === "checkout.session.completed") {
-    const seen = await pool.query(
-      "SELECT 1 FROM stripe_events WHERE id = $1",
-      [event.id]
-    );
-
-    if (seen.rowCount > 0) return res.json({ received: true });
-
-    const session = event.data.object;
-    const subscription = await stripe.subscriptions.retrieve(
-      session.subscription
-    );
-
-    const priceId = subscription.items.data[0].price.id;
-      if (!ALLOWED_PRICES.includes(priceId)) {
-        return res.json({ received: true });
-      }
-
-    console.log("✅ Access token stored:", token);
-  }
-
-  res.json({ received: true });
-});
+);
 
 app.use(express.json());
 app.use(express.static("public"));
@@ -83,7 +69,6 @@ app.post("/create-checkout-session", async (req, res) => {
     }
 
     const token = crypto.randomBytes(32).toString("hex");
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
@@ -93,63 +78,56 @@ app.post("/create-checkout-session", async (req, res) => {
       cancel_url: `${process.env.BASE_URL}/cancel.html`,
     });
 
-    await pool.query(
+     await pool.query(
       `
-      INSERT INTO access_tokens (token, session_id, created_at, expires_at)
-      VALUES ($1, $2, NOW(), $3)
+      INSERT INTO access_tokens (
+        token,
+        session_id,
+        created_at,
+        expires_at,
+        used,
+        max_uses
+      )
+      VALUES ($1, $2, NOW(), $3, 0, 5)
       `,
       [token, session.id, expiresAt]
     );
 
     res.json({ url: session.url });
   } catch (err) {
-    console.error("Stripe FULL error:", err);
-    res.status(500).json({ error: err.message });
+    console.error("❌ Checkout error:", err);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
 app.get("/redirect-after-success", async (req, res) => {
-  const { session_id } = req.query;
-  if (!session_id) {
-    return res.status(400).send("Missing session ID");
-  }
-
-  const result = await pool.query(
-    `SELECT token FROM access_tokens WHERE session_id = $1`,
-    [session_id]
-  );
-
- if (result.rowCount === 0) {
-  return res.status(404).send("Access link not found");
-}
-const { token } = result.rows[0];
-
-  res.redirect(`/access?token=${token}`);
-});
-
-app.get("/session-status", async (req, res) => {
-  const { session_id } = req.query;
-
-  if (!session_id) {
-    return res.status(400).json({ error: "Missing session_id" });
-  }
-
   try {
-    const session = await stripe.checkout.sessions.retrieve(session_id);
+    const { session_id } = req.query;
+    
+    if (!session_id) {
+      return res.status(400).send("Missing session ID");
+    }
 
-    res.json({
-      status: session.payment_status,
-      customer_email: session.customer_details?.email,
-    });
+    const result = await pool.query(
+      `SELECT token FROM access_tokens WHERE session_id = $1`,
+      [session_id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).send("Access link not found");
+    }
+    res.redirect(`/access?token=${result.rows[0].token}`);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Unable to retrieve session" });
+    console.error("❌ Redirect error:", err);
+    res.status(500).send("Internal server error");
   }
 });
 
 app.get("/access", async (req, res) => {
-  const { token } = req.query;
-  if (!token) {
+   try {
+    const { token } = req.query;
+  
+    if (!token) {
     return res.status(400).send("❌ Missing access token");
   }
 
@@ -178,12 +156,14 @@ app.get("/access", async (req, res) => {
     [token]
   );
 
-  res.sendFile(
-    path.join(__dirname, "public", "product.html")
-  );
+    res.sendFile(
+      path.join(__dirname, "public", "product.html")
+    );
+  } catch (err) {
+    console.error("❌ Access error:", err);
+    res.status(500).send("Internal server error");
+  }
 });
-
-const PORT = process.env.PORT || 4242;
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Server running on port ${PORT}`);
