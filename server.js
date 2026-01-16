@@ -83,7 +83,8 @@ app.use(express.json());
 app.use(express.static("public"));
 
 app.post("/create-checkout-session", async (req, res) => {
-  try {
+  const token = crypto.randomBytes(32).toString("hex");
+try {
     const { priceId } = req.body;
 
     if (!priceId) {
@@ -97,9 +98,16 @@ app.post("/create-checkout-session", async (req, res) => {
     const session = await stripe.checkout.sessions.create({
       mode: "subscription", 
      line_items: [{ price: priceId, quantity: 1 }],
+       metadata: { token },
       success_url: `${process.env.BASE_URL}/redirect-after-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.BASE_URL}/cancel.html`,
     });
+
+    await pool.query(
+  `INSERT INTO access_tokens (token, session_id)
+   VALUES ($1, $2)`,
+  [token, session.id]
+);
 
     res.json({ url: session.url });
   } catch (err) {
