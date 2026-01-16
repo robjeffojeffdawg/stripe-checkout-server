@@ -97,7 +97,7 @@ app.post("/create-checkout-session", async (req, res) => {
     const session = await stripe.checkout.sessions.create({
       mode: "subscription", 
      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${process.env.BASE_URL}/success.html?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${process.env.BASE_URL}/redirect-after-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.BASE_URL}/cancel.html`,
     });
 
@@ -129,22 +129,19 @@ app.get("/checkout-session", async (req, res) => {
 app.get("/access", async (req, res) => {
   const { token } = req.query;
 
-  await pool.query(
-  `DELETE FROM access_tokens
-   WHERE created_at < NOW() - INTERVAL '7 days'`
-);
-
-  if (access.email && access.email !== req.query.email) {
-  return res.status(403).send("❌ This link is tied to another email");
-}
   if (!token) {
     return res.status(400).send("❌ Missing access token");
   }
 
-  const result = await pool.query(
-    `SELECT * FROM access_tokens WHERE token = $1`,
-    [token]
-  );
+ const result = await pool.query(
+  `
+  SELECT *
+  FROM access_tokens
+  WHERE token = $1
+    AND created_at + INTERVAL '7 days' > NOW()
+  `,
+  [token]
+);
 
   if (result.rows.length === 0) {
     return res.status(403).send("❌ Invalid or expired access link");
@@ -152,16 +149,10 @@ app.get("/access", async (req, res) => {
 
   const access = result.rows[0];
 
-  const expired =
-  Date.now() - new Date(access.created_at).getTime() > TOKEN_TTL_MS;
-
-if (expired) {
-  return res.status(403).send("❌ Access link expired");
-}
-
 if (access.used >= access.max_uses) {
   return res.status(403).send("❌ Usage limit reached");
 }
+
 await pool.query(
   `UPDATE access_tokens SET used = used + 1 WHERE token = $1`,
   [token]
@@ -187,6 +178,8 @@ const PORT = process.env.PORT || 4242;
 
   if (result.rows.length === 0) {
     return res.status(404).send("Access link not found");
+      if (result.rowCount === 0) {
+  }
   }
 const { token } = result.rows[0];
 
