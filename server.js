@@ -96,22 +96,14 @@ try {
       cancel_url: `${process.env.BASE_URL}/cancel.html`,
     });
 
-  await pool.query(
+ const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+await pool.query(
   `
-  INSERT INTO access_tokens (
-    token,
-    session_id,
-    created_at,
-    expires_at
-  )
-  VALUES (
-    $1,
-    $2,
-    NOW(),
-    NOW() + INTERVAL '${TOKEN_TTL_DAYS} days'
-  )
+  INSERT INTO access_tokens (token, session_id, created_at, expires_at)
+  VALUES ($1, $2, NOW(), $3)
   `,
-  [token, session.id]
+  [token, session.id, expiresAt]
 );
 
     res.json({ url: session.url });
@@ -143,7 +135,6 @@ app.get("/session-status", async (req, res) => {
 
 app.get("/access", async (req, res) => {
   const { token } = req.query;
-  const result = await pool.query(
   `
   SELECT *
   FROM access_tokens
@@ -151,7 +142,6 @@ app.get("/access", async (req, res) => {
     AND expires_at > NOW()
   `,
   [token]
-);
 
   if (!token) {
     return res.status(400).send("❌ Missing access token");
