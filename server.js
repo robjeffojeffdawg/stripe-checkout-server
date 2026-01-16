@@ -3,6 +3,7 @@ const express = require("express");
 const Stripe = require("stripe");
 const crypto = require("crypto");
 const path = require("path");
+const TOKEN_TTL_DAYS = 7;
 
 const pool = require("./db");
 pool.query("SELECT 1")
@@ -95,9 +96,21 @@ try {
       cancel_url: `${process.env.BASE_URL}/cancel.html`,
     });
 
-   await pool.query(
-  `INSERT INTO access_tokens (token, session_id, created_at)
-   VALUES ($1, $2, NOW())`,
+  await pool.query(
+  `
+  INSERT INTO access_tokens (
+    token,
+    session_id,
+    created_at,
+    expires_at
+  )
+  VALUES (
+    $1,
+    $2,
+    NOW(),
+    NOW() + INTERVAL '${TOKEN_TTL_DAYS} days'
+  )
+  `,
   [token, session.id]
 );
 
@@ -130,15 +143,19 @@ app.get("/session-status", async (req, res) => {
 
 app.get("/access", async (req, res) => {
   const { token } = req.query;
+  const result = await pool.query(
+  `
+  SELECT *
+  FROM access_tokens
+  WHERE token = $1
+    AND expires_at > NOW()
+  `,
+  [token]
+);
 
   if (!token) {
     return res.status(400).send("❌ Missing access token");
   }
-await pool.query(
-  `INSERT INTO access_tokens (token, session_id, created_at)
-   VALUES ($1, $2, NOW())`,
-  [token, session.id]
-);
 
   if (result.rows.length === 0) {
     return res.status(403).send("❌ Invalid or expired access link");
