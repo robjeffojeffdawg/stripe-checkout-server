@@ -3,6 +3,11 @@ const express = require("express");
 const Stripe = require("stripe");
 const crypto = require("crypto");
 
+const pool = require("./db");
+pool.query("SELECT 1")
+  .then(() => console.log("✅ DB connected"))
+  .catch(err => console.error("❌ DB connection failed:", err));
+
 const app = express();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 if (
@@ -14,8 +19,6 @@ if (
 
 const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; 
 const MAX_TOKEN_USES = 5;
-
-const pool = require("./db");
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
@@ -123,7 +126,6 @@ app.get("/checkout-session", async (req, res) => {
   }
 });
 
-
 app.get("/access", async (req, res) => {
   const { token } = req.query;
 
@@ -170,7 +172,6 @@ res.sendFile(
 );
 });
 const PORT = process.env.PORT || 4242;
-
 
   app.get("/redirect-after-success", async (req, res) => {
   const { session_id } = req.query;
