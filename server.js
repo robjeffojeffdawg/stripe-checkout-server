@@ -95,9 +95,9 @@ try {
       cancel_url: `${process.env.BASE_URL}/cancel.html`,
     });
 
-    await pool.query(
-  `INSERT INTO access_tokens (token, session_id)
-   VALUES ($1, $2)`,
+   await pool.query(
+  `INSERT INTO access_tokens (token, session_id, created_at)
+   VALUES ($1, $2, NOW())`,
   [token, session.id]
 );
 
@@ -134,15 +134,10 @@ app.get("/access", async (req, res) => {
   if (!token) {
     return res.status(400).send("❌ Missing access token");
   }
-
- const result = await pool.query(
-  `
-  SELECT *
-  FROM access_tokens
-  WHERE token = $1
-    AND created_at + INTERVAL '7 days' > NOW()
-  `,
-  [token]
+await pool.query(
+  `INSERT INTO access_tokens (token, session_id, created_at)
+   VALUES ($1, $2, NOW())`,
+  [token, session.id]
 );
 
   if (result.rows.length === 0) {
