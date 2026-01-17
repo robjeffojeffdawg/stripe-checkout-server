@@ -37,3 +37,9 @@ VALUES ('test-token-123', 'test-session-123', NOW(), NOW() + INTERVAL '30 days',
 SELECT token, session_id, created_at, expires_at, used, max_uses FROM access_tokens WHERE token = 'test-token-123';
 
 DELETE FROM access_tokens WHERE token = 'test-token-123';
+ALTER TABLE access_tokens
+ADD COLUMN max_uses INTEGER NOT NULL DEFAULT 5;
+SELECT column_name
+FROM information_schema.columns
+WHERE table_name = 'access_tokens'
+ORDER BY column_name;
