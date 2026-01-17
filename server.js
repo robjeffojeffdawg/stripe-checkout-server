@@ -32,26 +32,56 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
-  const sig = req.headers["stripe-signature"];
-  
-  if (!sig) return res.status(400).send("Missing signature");
-
-  let event;
-  try {
-    event = stripe.webhooks.constructEvent(
-      req.body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
-
-     res.json({ received: true });
-  } catch (err) {
-     console.error("❌ Webhook verification failed:", err.message);
-    res.status(400).send(`Webhook Error: ${err.message}`);
+app.post(
+  "/webhook",
+  express.raw({ type: "application/json" }),
+  async (req, res) => {
+    const sig = req.headers["stripe-signature"];
+    if (!sig) {
+      console.error("❌ Missing Stripe signature header");
+      return res.status(400).send("Missing signature");
     }
-  }
-);
+
+    let event;
+    try {
+      event = stripe.webhooks.constructEvent(
+        req.body,
+        sig,
+        process.env.STRIPE_WEBHOOK_SECRET
+      );
+    } catch (err) {
+      console.error("❌ Webhook verification failed:", err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+  
+    try {
+      if (event.type === "checkout.session.completed") {
+        const session = event.data.object;
+  
+        if (session.payment_status && session.payment_status !== "paid") {
+          console.warn("⚠️ checkout.session.completed but payment_status != paid:", session.id, session.payment_status);
+          return res.json({ received: true });
+        }
+  
+        const subscription = await stripe.subscriptions.retrieve(
+          session.subscription
+        );
+  
+        const priceId = subscription.items.data[0].price.id;
+  
+        if (!ALLOWED_PRICES.includes(priceId)) {
+          console.warn("⚠️ checkout.session.completed with disallowed price:", priceId, "session:", session.id);
+          return res.json({ received: true });
+        }
+  
+        console.log("✅ checkout.session.completed validated for session:", session.id);
+        return res.json({ received: true });
+      }
+    } catch (err) {
+      console.error("❌ Error processing webhook event:", err);
+      return res.status(500).send("Webhook processing error");
+    }
+  });
 
 app.use(express.json());
 app.use(express.static("public"));
@@ -69,6 +99,7 @@ app.post("/create-checkout-session", async (req, res) => {
     }
 
     const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
@@ -78,7 +109,7 @@ app.post("/create-checkout-session", async (req, res) => {
       cancel_url: `${process.env.BASE_URL}/cancel.html`,
     });
 
-     await pool.query(
+    await pool.query(
       `
       INSERT INTO access_tokens (
         token,
@@ -107,15 +138,16 @@ app.get("/redirect-after-success", async (req, res) => {
     if (!session_id) {
       return res.status(400).send("Missing session ID");
     }
-
+  
     const result = await pool.query(
       `SELECT token FROM access_tokens WHERE session_id = $1`,
       [session_id]
     );
 
-    if (result.rowCount === 0) {
-      return res.status(404).send("Access link not found");
+    if (result.rows.length === 0) {
+      return res.status(404).send("Session not found");
     }
+  
     res.redirect(`/access?token=${result.rows[0].token}`);
   } catch (err) {
     console.error("❌ Redirect error:", err);
@@ -124,12 +156,12 @@ app.get("/redirect-after-success", async (req, res) => {
 });
 
 app.get("/access", async (req, res) => {
-   try {
+  try {
     const { token } = req.query;
   
     if (!token) {
-    return res.status(400).send("❌ Missing access token");
-  }
+      return res.status(400).send("❌ Missing access token");
+    }
 
   const result = await pool.query(
     `
