@@ -57,7 +57,17 @@ app.post(
     try {
       if (event.type === "checkout.session.completed") {
         const session = event.data.object;
-  
+        const stripeCustomerId = session.customer;
+
+await pool.query(
+  `
+  UPDATE access_tokens
+  SET stripe_customer_id = $1
+  WHERE session_id = $2
+  `,
+  [stripeCustomerId, session.id]
+);
+
         if (session.payment_status && session.payment_status !== "paid") {
           console.warn("⚠️ checkout.session.completed but payment_status != paid:", session.id, session.payment_status);
           return res.json({ received: true });
@@ -75,6 +85,7 @@ app.post(
         }
   
         console.log("✅ checkout.session.completed validated for session:", session.id);
+       
         return res.json({ received: true });
       }
     } catch (err) {
@@ -101,13 +112,18 @@ app.post("/create-checkout-session", async (req, res) => {
     const token = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    const session = await stripe.checkout.sessions.create({
-      mode: "subscription",
-      line_items: [{ price: priceId, quantity: 1 }],
-      metadata: { token },
-      success_url: `${process.env.BASE_URL}/redirect-after-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.BASE_URL}/cancel.html`,
-    });
+ const session = await stripe.checkout.sessions.create({
+  mode: "subscription",
+
+  payment_method_types: ["card", "wechat_pay"],
+
+  line_items: [{ price: priceId, quantity: 1 }],
+
+  customer_creation: "always",
+
+  success_url: `${process.env.BASE_URL}/redirect-after-success?session_id={CHECKOUT_SESSION_ID}`,
+  cancel_url: `${process.env.BASE_URL}/cancel.html`,
+});
 
     await pool.query(
       `
