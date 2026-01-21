@@ -4,6 +4,7 @@ const express = require("express");
 const Stripe = require("stripe");
 const crypto = require("crypto");
 const path = require("path");
+const PRICE_ID = process.env.STRIPE_PRICE_ID;
 
 const pool = require("./db");
 
@@ -105,56 +106,30 @@ app.use(express.static("public"));
 
 app.post("/create-checkout-session", async (req, res) => {
   try {
-    const { priceId } = req.body;
+    const price = process.env.STRIPE_PRICE_ID;
 
-    if (!priceId) {
-      return res.status(400).json({ error: "Missing priceId" });
+    if (!price) {
+      throw new Error("STRIPE_PRICE_ID missing in env");
     }
 
-    if (!ALLOWED_PRICES.includes(priceId)) {
-      return res.status(400).json({ error: "Invalid priceId" });
-    }
-
-    const token = crypto.randomBytes(32).toString("hex");
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    console.log("👉 Creating checkout session for price:", priceId);
-
- const session = await stripe.checkout.sessions.create({
-  mode: "payment",
-payment_method_types: ["card", "wechat_pay"],
-
- line_items: [
-    {
-      price: process.env.STRIPE_PRICE_ID, // must be ONE-TIME price
-      quantity: 1,
-    },
-  ],
-
-  success_url: `${process.env.BASE_URL}/redirect-after-success?session_id={CHECKOUT_SESSION_ID}`,
-  cancel_url: `${process.env.BASE_URL}/cancel.html`,
-});
-
-    await pool.query(
-      `
-      INSERT INTO access_tokens (
-        token,
-        session_id,
-        created_at,
-        expires_at,
-        used,
-        max_uses
-      )
-      VALUES ($1, $2, NOW(), $3, 0, 5)
-      `,
-      [token, session.id, expiresAt]
-    );
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      payment_method_types: ["card", "wechat_pay"],
+      line_items: [
+        {
+          price,
+          quantity: 1,
+        },
+      ],
+      success_url: `${process.env.BASE_URL}/success.html?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.BASE_URL}/cancel.html`,
+    });
 
     res.json({ url: session.url });
   } catch (err) {
-    console.error("❌ Checkout error:", err);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("❌ Checkout error:", err.message);
+    res.status(500).json({ error: err.message });
   }
-  console.log("👉 Creating checkout session for price:", priceId);
 });
 
 app.get("/redirect-after-success", async (req, res) => {

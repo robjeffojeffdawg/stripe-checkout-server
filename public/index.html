@@ -10,42 +10,22 @@
 <body>
   <h1>Choose a product</h1>
 
- <button onclick="pay('price_1SokWfAG2360Iu0s5hr6g5JH')">
-  Buy Basic
-</button>
+  <button onclick="pay()">Buy Premium</button>
 
-<button onclick="pay('price_1SokXdAG2360Iu0s7lZJWy3z')">
-  Buy Premium
-</button>
-   
-  <script>
+<script>
+  async function pay() {
+    const res = await fetch("/create-checkout-session", {
+      method: "POST",
+    });
+
     const stripe = Stripe(
       "pk_test_51HJeiVAG2360Iu0sR7j4nGRCh5X7EkXFzmuPw2REopZ4TXuFnl5JL984bfNK9gWlIoWp79nta3rmvPny2HUR55Ui00FL0fyUJG"
     );
 
-    async function pay(priceId) {
-      try {
-    const res = await fetch(
-      "https://stripe-checkout-server-4w4i.onrender.com/create-checkout-session",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ priceId }),
-      }
-    );
-
     const data = await res.json();
-
-    if (data.url) {
-          window.location.href = data.url;
-        } else {
-          alert(data.error);
-        }
-      } catch (err) {
-        console.error(err);
-        alert("Network error");
-      }
-    }
-  </script>
+    if (data.url) window.location.href = data.url;
+    else alert(data.error);
+  }
+</script>
 </body>
 </html>
