@@ -119,8 +119,6 @@ app.post("/create-checkout-session", async (req, res) => {
 
   line_items: [{ price: priceId, quantity: 1 }],
 
-  customer_creation: "always",
-
   success_url: `${process.env.BASE_URL}/redirect-after-success?session_id={CHECKOUT_SESSION_ID}`,
   cancel_url: `${process.env.BASE_URL}/cancel.html`,
 });
