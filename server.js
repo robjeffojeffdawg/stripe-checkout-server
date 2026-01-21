@@ -59,14 +59,20 @@ app.post(
         const session = event.data.object;
         const stripeCustomerId = session.customer;
 
-await pool.query(
-  `
-  UPDATE access_tokens
-  SET stripe_customer_id = $1
-  WHERE session_id = $2
-  `,
-  [stripeCustomerId, session.id]
-);
+if (session.customer) {
+  await pool.query(
+    `
+    UPDATE access_tokens
+    SET stripe_customer_id = $1
+    WHERE session_id = $2
+    `,
+    [session.customer, session.id]
+  );
+
+  console.log("✅ Saved customer:", session.customer);
+} else {
+  console.warn("⚠️ No customer on session:", session.id);
+}
 
         if (session.payment_status && session.payment_status !== "paid") {
           console.warn("⚠️ checkout.session.completed but payment_status != paid:", session.id, session.payment_status);
@@ -111,13 +117,18 @@ app.post("/create-checkout-session", async (req, res) => {
 
     const token = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    console.log("👉 Creating checkout session for price:", priceId);
 
  const session = await stripe.checkout.sessions.create({
-  mode: "subscription",
+  mode: "payment",
+payment_method_types: ["card", "wechat_pay"],
 
-  payment_method_types: ["card", "wechat_pay"],
-
-  line_items: [{ price: priceId, quantity: 1 }],
+ line_items: [
+    {
+      price: process.env.STRIPE_PRICE_ID, // must be ONE-TIME price
+      quantity: 1,
+    },
+  ],
 
   success_url: `${process.env.BASE_URL}/redirect-after-success?session_id={CHECKOUT_SESSION_ID}`,
   cancel_url: `${process.env.BASE_URL}/cancel.html`,
@@ -143,6 +154,7 @@ app.post("/create-checkout-session", async (req, res) => {
     console.error("❌ Checkout error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
+  console.log("👉 Creating checkout session for price:", priceId);
 });
 
 app.get("/redirect-after-success", async (req, res) => {
