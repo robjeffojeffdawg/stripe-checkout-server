@@ -115,6 +115,11 @@ app.post("/create-checkout-session", async (req, res) => {
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card", "wechat_pay"],
+    payment_method_options: {
+        wechat_pay: {
+          client: "web",
+        },
+      },
       line_items: [
         {
           price,
