@@ -5,18 +5,30 @@
     <title>Payment successful</title>
   </head>
   <body>
-    <p>Payment successful. Redirecting…</p>
+    <h2>Processing payment…</h2>
 
     <script>
       const params = new URLSearchParams(window.location.search);
       const sessionId = params.get("session_id");
 
       if (!sessionId) {
-        document.body.innerText = "Missing session ID.";
-      } else {
-        window.location.href = `/redirect-after-success?session_id=${sessionId}`;
+        document.body.innerHTML = "<h2>❌ Session not found</h2>";
+        throw new Error("No session_id in URL");
       }
+
+      fetch(`/checkout-session?session_id=${sessionId}`)
+        .then(res => {
+          if (!res.ok) throw new Error("Session fetch failed");
+          return res.json();
+        })
+        .then(session => {
+          console.log("✅ Verified session:", session.id);
+          document.body.innerHTML = "<h2>✅ Payment successful 🎉</h2>";
+        })
+        .catch(err => {
+          console.error(err);
+          document.body.innerHTML = "<h2>❌ Session not found</h2>";
+        });
     </script>
   </body>
 </html>
-
