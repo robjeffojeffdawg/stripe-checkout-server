@@ -90,6 +90,28 @@ app.get("/checkout-session", async (req, res) => {
   }
 }); // Added closing brace and parenthesis for the GET handler
 
+app.get("/verify-session", async (req, res) => {
+  const { session_id } = req.query;
+
+  if (!session_id) {
+    return res.status(400).json({ valid: false });
+  }
+
+  try {
+    const session = await stripe.checkout.sessions.retrieve(session_id);
+
+    if (session.payment_status === "paid") {
+      return res.json({ valid: true });
+    }
+
+    return res.json({ valid: false });
+  } catch (err) {
+    console.error("Session verification error:", err.message);
+    return res.status(500).json({ valid: false });
+  }
+});
+
+
 app.listen(PORT, "0.0.0.0", () => { 
   console.log(`✅ Server running on port ${PORT}`); // Fixed: added backticks for template literal
 });

@@ -15,5 +15,34 @@
     <li>Embedded video</li>
     <li>Instructions / dashboard</li>
   </ul>
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const sessionId = params.get("session_id");
+
+  if (!sessionId) {
+    document.body.innerHTML = "Access denied.";
+    throw new Error("No session ID");
+  }
+
+  fetch(`/verify-session?session_id=${sessionId}`)
+    .then(res => res.json())
+    .then(data => {
+      if (!data.valid) {
+        document.body.innerHTML = "Access denied.";
+      } else {
+        document.getElementById("content").style.display = "block";
+      }
+    })
+    .catch(() => {
+      document.body.innerHTML = "Access denied.";
+    });
+</script>
+
+<div id="content" style="display:none;">
+  <!-- Your paid content goes here -->
+  <h1>Welcome 🎉</h1>
+  <p>You now have full access.</p>
+</div>
+
 </body>
 </html>
