@@ -58,34 +58,24 @@ app.post(
     try {
       if (event.type === "checkout.session.completed") {
         const session = event.data.object;
-        const stripeCustomerId = session.customer;
 
-if (session.customer) {
-  await pool.query(
-    `
-    UPDATE access_tokens
-    SET stripe_customer_id = $1
-    WHERE session_id = $2
-    `,
-    [session.customer, session.id]
-  );
-
-  console.log("✅ Saved customer:", session.customer);
-} else {
-  console.warn("⚠️ No customer on session:", session.id);
-}
-
-        if (session.payment_status && session.payment_status !== "paid") {
-          console.warn("⚠️ checkout.session.completed but payment_status != paid:", session.id, session.payment_status);
+        if (session.payment_status !== "paid") {
+          console.warn("⚠️ checkout.session.completed but not paid:", session.id, session.payment_status);
           return res.json({ received: true });
         }
-  
-        const subscription = await stripe.subscriptions.retrieve(
-          session.subscription
-        );
-  
-        const priceId = subscription.items.data[0].price.id;
-  
+
+        if (session.mode === "payment") {
+  console.log("✅ One-time payment confirmed", session.id);
+
+  // grant access here
+  // example:
+  // await pool.query("UPDATE users SET paid = true WHERE email = $1", [
+  //   session.customer_details.email
+  // ]);
+
+  return res.json({ received: true });
+}
+
         if (!ALLOWED_PRICES.includes(priceId)) {
           console.warn("⚠️ checkout.session.completed with disallowed price:", priceId, "session:", session.id);
           return res.json({ received: true });
