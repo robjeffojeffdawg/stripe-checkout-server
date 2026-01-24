@@ -4,13 +4,15 @@ const Stripe = require("stripe");
 const path = require("path");
 const crypto = require("crypto");
 
-const app = express();
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-const PORT = process.env.PORT || 10000;
 
 // TEMP token store (memory only)
 const accessTokens = new Map();
 // token -> { sessionId, createdAt }
+
+const app = express();
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const PORT = process.env.PORT || 10000;
+
 
 if (
   process.env.STRIPE_SECRET_KEY.includes("test") &&
@@ -63,11 +65,6 @@ app.post("/webhook", express.raw({ type: "application/json" }), (req, res) => { 
 }); // Added closing brace and parenthesis for webhook POST route
 
 app.use(express.json());
-app.use(express.static("public"));
-
-app.get("/product.html", (req, res) => {
-  res.status(403).send("Forbidden");
-});
 
 app.post("/create-checkout-session", async (req, res) => {
   try {
@@ -119,8 +116,14 @@ app.get("/access", (req, res) => {
     return res.status(403).send("❌ Invalid access link");
   }
 
-  res.sendFile(path.join(__dirname, "public", "product.html"));
+  res.sendFile(path.join(__dirname, "protected", "product.html"));
 });
+
+app.get("/product.html", (req, res) => {
+  res.status(403).send("Forbidden");
+});
+
+app.use(express.static("public"));
 
 app.get("/checkout-session", async (req, res) => {
   try {
