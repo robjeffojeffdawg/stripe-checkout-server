@@ -122,23 +122,23 @@ app.get("/access", (req, res) => {
 app.get("/download", (req, res) => {
   const { token, file } = req.query;
 
-  console.log("📦 Download requested:", file);
-
   if (!token || !accessTokens.has(token)) {
     return res.status(403).send("❌ Invalid token");
   }
 
-  const allowedFiles = new Set([
-  "premium.zip",
-  "bonus.pdf",
-  "resources.zip",
-]);
+  const allowedFiles = ["premium.zip"];
 
-if (!allowedFiles.has(file)) {
-  return res.status(403).send("❌ File not allowed");
-}
+  if (!allowedFiles.includes(file)) {
+    return res.status(403).send("❌ File not allowed");
+  }
 
   const filePath = path.join(__dirname, "protected", file);
+
+  // 🔎 HARD CHECK
+  if (!require("fs").existsSync(filePath)) {
+    console.error("❌ File missing:", filePath);
+    return res.status(404).send("❌ File not found on server");
+  }
 
   res.download(filePath);
 });
