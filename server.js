@@ -1,12 +1,16 @@
 require("dotenv").config();
-
 const express = require("express");
 const Stripe = require("stripe");
 const path = require("path");
+const crypto = require("crypto");
 
 const app = express();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const PORT = process.env.PORT || 10000;
+
+// TEMP token store (memory only)
+const accessTokens = new Map();
+// token -> { sessionId, createdAt }
 
 if (
   process.env.STRIPE_SECRET_KEY.includes("test") &&
@@ -19,37 +23,51 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-app.post(
-  "/webhook",
-  express.raw({ type: "application/json" }),
-  async (req, res) => {
-   
-    let event;
-    try {
-      event = stripe.webhooks.constructEvent(
-        req.body,
-        req.headers["stripe-signature"],
-        process.env.STRIPE_WEBHOOK_SECRET
-      );
-    } catch (err) {
-      console.error("❌ Webhook verification failed:", err.message);
-      return res.status(400).send("Webhook Error");
-    }
-  
-    if (event.type === "checkout.session.completed") {
-      const session = event.data.object;
+app.post("/webhook", express.raw({ type: "application/json" }), (req, res) => { // Changed bodyParser to express
+  const sig = req.headers["stripe-signature"];
 
-      if (session.payment_status === "paid") {
-        console.log("✅ Payment confirmed via webhook:", session.id); // Fixed: removed semicolon before parenthesis
-      }
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch (err) {
+    console.error("❌ Webhook signature failed:", err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object;
+
+    if (session.payment_status !== "paid") {
+      return res.json({ received: true });
     }
-    
-    res.json({ received: true });
-  } // Added closing brace for the webhook POST handler
-); // Added closing parenthesis for app.post
+
+    // Generate permanent access token
+    const token = crypto.randomBytes(32).toString("hex");
+
+    accessTokens.set(token, {
+      sessionId: session.id,
+      createdAt: Date.now(),
+    });
+
+    console.log("✅ Payment confirmed. Token created:", token);
+
+    return res.json({ received: true });
+  }
+  
+  res.json({ received: true }); // Added default response for other event types
+}); // Added closing brace and parenthesis for webhook POST route
 
 app.use(express.json());
 app.use(express.static("public"));
+
+app.get("/product.html", (req, res) => {
+  res.status(403).send("Forbidden");
+});
 
 app.post("/create-checkout-session", async (req, res) => {
   try {
@@ -78,6 +96,32 @@ app.post("/create-checkout-session", async (req, res) => {
   }
 });
 
+app.get("/exchange-session-for-token", (req, res) => {
+  const { session_id } = req.query;
+
+  if (!session_id) {
+    return res.status(400).json({ error: "Missing session_id" });
+  }
+
+  for (const [token, data] of accessTokens.entries()) {
+    if (data.sessionId === session_id) {
+      return res.json({ token });
+    }
+  }
+
+  return res.status(404).json({ error: "Token not found yet" });
+});
+
+app.get("/access", (req, res) => {
+  const { token } = req.query;
+
+  if (!token || !accessTokens.has(token)) {
+    return res.status(403).send("❌ Invalid access link");
+  }
+
+  res.sendFile(path.join(__dirname, "public", "product.html"));
+});
+
 app.get("/checkout-session", async (req, res) => {
   try {
     const session = await stripe.checkout.sessions.retrieve(
@@ -88,7 +132,7 @@ app.get("/checkout-session", async (req, res) => {
     console.error("❌ Session fetch error:", err.message);
     res.status(400).json({ error: err.message });
   }
-}); // Added closing brace and parenthesis for the GET handler
+});
 
 app.get("/verify-session", async (req, res) => {
   const { session_id } = req.query;
@@ -111,7 +155,6 @@ app.get("/verify-session", async (req, res) => {
   }
 });
 
-
 app.listen(PORT, "0.0.0.0", () => { 
-  console.log(`✅ Server running on port ${PORT}`); // Fixed: added backticks for template literal
+  console.log(`✅ Server running on port ${PORT}`);
 });

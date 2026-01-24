@@ -6,29 +6,27 @@
   </head>
   <body>
     <h2>Processing payment…</h2>
+    
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const sessionId = params.get("session_id");
 
-    <script>
-      const params = new URLSearchParams(window.location.search);
-      const sessionId = params.get("session_id");
+  if (!sessionId) {
+    document.body.innerHTML = "<h2>Missing session ID</h2>";
+    throw new Error("No session_id");
+  }
 
-      if (!sessionId) {
-        document.body.innerHTML = "<h2>❌ Session not found</h2>";
-        throw new Error("No session_id in URL");
-      }
-
-      fetch(`/checkout-session?session_id=${sessionId}`)
-        .then(res => {
-          if (!res.ok) throw new Error("Session fetch failed");
-          return res.json();
-        })
-        .then(session => {
-          console.log("✅ Verified session:", session.id);
-          document.body.innerHTML = "<h2>✅ Payment successful 🎉</h2>";
-        })
-        .catch(err => {
-          console.error(err);
-          document.body.innerHTML = "<h2>❌ Session not found</h2>";
-        });
-    </script>
+  fetch(`/exchange-session-for-token?session_id=${sessionId}`)
+    .then(res => res.json())
+    .then(data => {
+      if (!data.token) throw new Error("No token returned");
+      window.location.href = `/access?token=${data.token}`;
+    })
+    .catch(err => {
+      console.error(err);
+      document.body.innerHTML = "<h2>Access error</h2>";
+    });
+</script>
+   
   </body>
 </html>
