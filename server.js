@@ -119,6 +119,18 @@ app.get("/access", (req, res) => {
   res.sendFile(path.join(__dirname, "protected", "product.html"));
 });
 
+app.get("/download", (req, res) => {
+  const { token } = req.query;
+
+  if (!token || !accessTokens.has(token)) {
+    return res.status(403).send("❌ Unauthorized");
+  }
+
+  const filePath = path.join(__dirname, "downloads", "premium.zip");
+
+  res.download(filePath, "your-product.zip");
+});
+
 app.get("/product.html", (req, res) => {
   res.status(403).send("Forbidden");
 });
