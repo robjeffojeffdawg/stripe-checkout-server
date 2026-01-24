@@ -120,15 +120,21 @@ app.get("/access", (req, res) => {
 });
 
 app.get("/download", (req, res) => {
-  const { token } = req.query;
+  const { token, file } = req.query;
 
   if (!token || !accessTokens.has(token)) {
-    return res.status(403).send("❌ Unauthorized");
+    return res.status(403).send("❌ Invalid token");
   }
 
-  const filePath = path.join(__dirname, "downloads", "premium.zip");
+  const allowedFiles = ["premium.zip"];
 
-  res.download(filePath, "your-product.zip");
+  if (!allowedFiles.includes(file)) {
+    return res.status(403).send("❌ File not allowed");
+  }
+
+  const filePath = path.join(__dirname, "protected", file);
+
+  res.download(filePath);
 });
 
 app.get("/product.html", (req, res) => {
