@@ -119,33 +119,54 @@ app.get("/access", (req, res) => {
   res.sendFile(path.join(__dirname, "protected", "product.html"));
 });
 
+const fs = require("fs");
+
 app.get("/download", (req, res) => {
-  const { token, file } = req.query;
+  try {
+    const { file, token } = req.query;
 
-  console.log("📦 DOWNLOADS DIR CONTENTS:", require("fs").readdirSync(
-  path.join(__dirname, "downloads"),
-  { withFileTypes: true }
-).map(f => f.name));
+    console.log("⬇️ Download hit");
+    console.log("➡️ file:", file);
+    console.log("➡️ token:", token);
+    console.log("➡️ tokens available:", [...accessTokens.keys()]);
 
-  if (!token || !accessTokens.has(token)) {
-    return res.status(403).send("❌ Invalid token");
+    if (!token || !accessTokens.has(token)) {
+      console.warn("❌ Invalid token");
+      return res.status(403).send("❌ Invalid token");
+    }
+
+    const ALLOWED_FILES = ["premium.zip"];
+
+    if (!ALLOWED_FILES.includes(file)) {
+      console.warn("❌ File not allowed:", file);
+      return res.status(403).send("❌ File not allowed");
+    }
+
+    const downloadsDir = path.join(__dirname, "downloads");
+    console.log("📁 downloads dir:", downloadsDir);
+
+    if (!fs.existsSync(downloadsDir)) {
+      console.error("❌ downloads directory does NOT exist");
+      return res.status(500).send("Downloads directory missing");
+    }
+
+    console.log("📦 files in downloads:", fs.readdirSync(downloadsDir));
+
+    const filePath = path.join(downloadsDir, file);
+    console.log("📄 full file path:", filePath);
+
+    if (!fs.existsSync(filePath)) {
+      console.error("❌ file missing on disk");
+      return res.status(404).send("❌ File not found");
+    }
+
+    console.log("✅ Serving file now");
+    res.download(filePath);
+
+  } catch (err) {
+    console.error("🔥 DOWNLOAD ROUTE CRASHED:", err);
+    res.status(500).send("Internal server error");
   }
-
-  const allowedFiles = ["premium.zip"];
-
-  if (!allowedFiles.includes(file)) {
-    return res.status(403).send("❌ File not allowed");
-  }
-
-  const filePath = path.join(__dirname, "protected", file);
-
-  // 🔎 HARD CHECK
-  if (!require("fs").existsSync(filePath)) {
-    console.error("❌ File missing:", filePath);
-    return res.status(404).send("❌ File not found on server");
-  }
-
-  res.download(filePath);
 });
 
 app.get("/product.html", (req, res) => {
