@@ -55,19 +55,7 @@
 
       <p>This is your purchased content.</p>
 
-  <a
-    href="/download?file=premium.zip&token=REPLACE_ME"
-  >
-    ⬇️ Download Premium Package
-  </a>
-
-    <p>
-      Your payment was successful. You now have permanent access
-      to your purchased content.
-    </p>
-
-    <a id="download-btn" class="download" href="#">
-      ⬇ Download your product
+  <a id="download">⬇️ Download Premium Package</a>
 
     </a>
 
@@ -77,16 +65,16 @@
   </div>
 
   <script>
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get("token");
+      const params = new URLSearchParams(window.location.search);
+  const token = params.get("token");
 
-    if (!token) {
-      document.body.innerHTML = "<h2>Access denied</h2>";
-      throw new Error("Missing token");
-    }
+  if (!token) {
+    document.body.innerHTML = "<h2>❌ Missing access token</h2>";
+    throw new Error("No token");
+  }
 
-    document.getElementById("download-btn").href =
-      `/download?token=${token}`;
+  document.getElementById("download").href =
+    `/download?file=premium.zip&token=${token}`;
   </script>
 </body>
 </html>

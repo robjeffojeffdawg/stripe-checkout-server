@@ -122,6 +122,11 @@ app.get("/access", (req, res) => {
 app.get("/download", (req, res) => {
   const { token, file } = req.query;
 
+  console.log("📦 DOWNLOADS DIR CONTENTS:", require("fs").readdirSync(
+  path.join(__dirname, "downloads"),
+  { withFileTypes: true }
+).map(f => f.name));
+
   if (!token || !accessTokens.has(token)) {
     return res.status(403).send("❌ Invalid token");
   }
