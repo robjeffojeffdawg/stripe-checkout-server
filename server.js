@@ -122,15 +122,21 @@ app.get("/access", (req, res) => {
 app.get("/download", (req, res) => {
   const { token, file } = req.query;
 
+  console.log("📦 Download requested:", file);
+
   if (!token || !accessTokens.has(token)) {
     return res.status(403).send("❌ Invalid token");
   }
 
-  const allowedFiles = ["premium.zip"];
+  const allowedFiles = new Set([
+  "premium.zip",
+  "bonus.pdf",
+  "resources.zip",
+]);
 
-  if (!allowedFiles.includes(file)) {
-    return res.status(403).send("❌ File not allowed");
-  }
+if (!allowedFiles.has(file)) {
+  return res.status(403).send("❌ File not allowed");
+}
 
   const filePath = path.join(__dirname, "protected", file);
 
