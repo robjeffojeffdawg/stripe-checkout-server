@@ -120,8 +120,6 @@ app.get("/access", (req, res) => {
   res.sendFile(path.join(__dirname, "protected", "product.html"));
 });
 
-const fs = require("fs");
-
 app.get("/download", (req, res) => {
   try {
     const { file, token } = req.query;
