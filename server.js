@@ -1,4 +1,6 @@
 require("dotenv").config();
+console.log("Stripe key exists:", !!process.env.STRIPE_SECRET_KEY)
+
 const express = require("express");
 const Stripe = require("stripe");
 const path = require("path");
@@ -75,6 +77,10 @@ app.post("/create-checkout-session", async (req, res) => {
       payment_method_options: {
         wechat_pay: {
           client: "web",
+           
+          customer_creation: "always",
+
+  billing_address_collection: "auto",
         },
       },
       line_items: [
