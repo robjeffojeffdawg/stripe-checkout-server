@@ -5,6 +5,16 @@ console.log(
 )
 console.log("Stripe key exists:", !!process.env.STRIPE_SECRET_KEY)
 
+const secret = process.env.STRIPE_SECRET_KEY || ""
+const webhook = process.env.STRIPE_WEBHOOK_SECRET || ""
+
+if (
+  (secret.includes("test") && webhook.includes("live")) ||
+  (secret.includes("live") && webhook.includes("test"))
+) {
+  throw new Error("Stripe keys mismatch: test vs live")
+}
+
 const express = require("express");
 const Stripe = require("stripe");
 const path = require("path");
