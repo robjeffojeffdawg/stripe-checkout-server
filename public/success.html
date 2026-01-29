@@ -1,32 +1,44 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Payment successful</title>
-  </head>
-  <body>
-    <h2>Processing payment…</h2>
-    
-<script>
-  const params = new URLSearchParams(window.location.search);
-  const sessionId = params.get("session_id");
+<head>
+  <title>Payment successful</title>
+</head>
+<body>
+  <h1>✅ Payment successful</h1>
+  <p>Unlocking your access…</p>
 
-  if (!sessionId) {
-    document.body.innerHTML = "<h2>Missing session ID</h2>";
-    throw new Error("No session_id");
-  }
+  <script>
+    const params = new URLSearchParams(window.location.search)
+    const sessionId = params.get("session_id")
 
-  fetch(`/exchange-session-for-token?session_id=${sessionId}`)
-    .then(res => res.json())
-    .then(data => {
-      if (!data.token) throw new Error("No token returned");
-      window.location.href = `/access?token=${data.token}`;
-    })
-    .catch(err => {
-      console.error(err);
-      document.body.innerHTML = "<h2>Access error</h2>";
-    });
-</script>
-   
-  </body>
+    if (!sessionId) {
+      document.body.innerHTML = "❌ Missing session ID"
+      throw new Error("No session_id in URL")
+    }
+
+    async function fetchToken(retries = 10) {
+      try {
+        const res = await fetch(`/exchange-session-for-token?session_id=${sessionId}`)
+        if (!res.ok) throw new Error("Token not ready")
+
+        const data = await res.json()
+        if (!data.token) throw new Error("No token returned")
+
+        // ✅ Redirect to protected content
+        window.location.href = `/access?token=${data.token}`
+
+      } catch (err) {
+        if (retries <= 0) {
+          document.body.innerHTML = "❌ Access not ready. Please refresh in a moment."
+          return
+        }
+
+        // wait 1 second and retry
+        setTimeout(() => fetchToken(retries - 1), 1000)
+      }
+    }
+
+    fetchToken()
+  </script>
+</body>
 </html>
