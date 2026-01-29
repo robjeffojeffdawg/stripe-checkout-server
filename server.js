@@ -123,10 +123,18 @@ app.get("/exchange-session-for-token", async (req, res) => {
 app.get("/access", (req, res) => {
   const { token } = req.query;
 
-  if (!token || !accessTokens.has(token)) {
-    return res.status(403).send("❌ Invalid access link");
-  }
+  const data = accessTokens.get(token)
 
+if (!data) {
+  return res.status(403).send("❌ Invalid access link");
+}
+
+// optional: 24h expiry
+const MAX_AGE = 24 * 60 * 60 * 1000
+if (Date.now() - data.createdAt > MAX_AGE) {
+  accessTokens.delete(token)
+  return res.status(403).send("❌ Access link expired");
+}
   res.sendFile(path.join(__dirname, "protected", "product.html"));
 });
 

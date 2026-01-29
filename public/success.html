@@ -5,7 +5,8 @@
 </head>
 <body>
   <h1>✅ Payment successful</h1>
-  <p>Unlocking your access…</p>
+  <p>Your payment has been confirmed.</p>
+  <p>We’re preparing your access now — you’ll be redirected automatically.</p>
 
   <script>
     const params = new URLSearchParams(window.location.search)
@@ -27,16 +28,15 @@
         // ✅ Redirect to protected content
         window.location.href = `/access?token=${data.token}`
 
-      } catch (err) {
-        if (retries <= 0) {
-          document.body.innerHTML = "❌ Access not ready. Please refresh in a moment."
-          return
+     } catch (err) {
+  document.body.innerHTML = "❌ We couldn’t unlock access automatically. Please refresh this page."
+  return
+}
+
         }
 
         // wait 1 second and retry
         setTimeout(() => fetchToken(retries - 1), 1000)
-      }
-    }
 
     fetchToken()
   </script>

@@ -50,31 +50,27 @@
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Welcome 👋</h1>
+  <!DOCTYPE html>
+<html>
+<head>
+  <title>Your Premium Package</title>
+</head>
+<body>
+  <h1>🎉 Your Premium Package Is Ready</h1>
 
-      <p>This is your purchased content.</p>
+  <p>Thank you for your purchase.</p>
 
-  <a id="download">⬇️ Download Premium Package</a>
+  <p>
+    You now have access to your premium digital package.
+    Click below to download your files.
+  </p>
 
-    </a>
+  <a href="/download?file=premium.zip">
+    ⬇️ Download Premium Package
+  </a>
 
-    <div class="hint">
-      Tip: Bookmark this page — it’s your permanent access link.
-    </div>
-  </div>
-
-  <script>
-      const params = new URLSearchParams(window.location.search);
-  const token = params.get("token");
-
-  if (!token) {
-    document.body.innerHTML = "<h2>❌ Missing access token</h2>";
-    throw new Error("No token");
-  }
-
-  document.getElementById("download").href =
-    `/download?file=premium.zip&token=${token}`;
-  </script>
+  <p style="margin-top: 20px; font-size: 0.9em; color: #555;">
+    This is a one-time purchase. No subscription or recurring charges.
+  </p>
 </body>
 </html>
