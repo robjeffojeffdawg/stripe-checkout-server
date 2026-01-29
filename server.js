@@ -1,4 +1,8 @@
 require("dotenv").config();
+console.log(
+  "Stripe key prefix:",
+  process.env.STRIPE_SECRET_KEY?.slice(0, 7)
+)
 console.log("Stripe key exists:", !!process.env.STRIPE_SECRET_KEY)
 
 const express = require("express");
