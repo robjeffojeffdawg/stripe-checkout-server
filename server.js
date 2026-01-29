@@ -16,6 +16,8 @@ const app = express();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const PORT = process.env.PORT || 10000;
 
+console.log("STRIPE_SECRET_KEY:", process.env.STRIPE_SECRET_KEY?.slice(0, 12))
+console.log("STRIPE_WEBHOOK_SECRET:", process.env.STRIPE_WEBHOOK_SECRET?.slice(0, 12))
 
 if (
   process.env.STRIPE_SECRET_KEY.includes("test") &&
@@ -95,9 +97,9 @@ app.post("/create-checkout-session", async (req, res) => {
 
     res.json({ url: session.url });
   } catch (err) {
-    console.error("❌ Checkout error:", err.message);
-    res.status(500).json({ error: err.message });
-  }
+  console.error("🔥 STRIPE ERROR:", err)
+  res.status(500).json({ error: err.message })
+}
 });
 
 app.get("/exchange-session-for-token", (req, res) => {
