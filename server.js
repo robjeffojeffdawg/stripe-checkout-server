@@ -62,6 +62,8 @@ app.use(express.static("public"));
 
 app.post("/create-checkout-session", async (req, res) => {
   try {
+    await stripe.customers.list({ limit: 1 });
+
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: [
