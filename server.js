@@ -81,16 +81,43 @@ app.post("/create-checkout-session", async (req, res) => {
   }
 });
 
-app.get("/exchange-session-for-token", (req, res) => {
+app.get("/exchange-session-for-token", async (req, res) => {
   const { session_id } = req.query;
 
-  for (const [token, data] of accessTokens.entries()) {
-    if (data.sessionId === session_id) {
-      return res.json({ token });
-    }
+  if (!session_id) {
+    return res.status(400).json({ error: "Missing session_id" });
   }
 
-  res.status(404).json({ error: "Token not found yet" });
+  try {
+    const session = await stripe.checkout.sessions.retrieve(session_id);
+
+    if (session.payment_status !== "paid") {
+      return res.status(403).json({ error: "Payment not completed" });
+    }
+
+    // 🔑 Reuse token if already created
+    for (const [token, data] of accessTokens.entries()) {
+      if (data.sessionId === session_id) {
+        return res.json({ token });
+      }
+    }
+
+    // 🔑 Create token NOW (no webhook dependency)
+    const token = crypto.randomBytes(32).toString("hex");
+
+    accessTokens.set(token, {
+      sessionId: session.id,
+      createdAt: Date.now(),
+    });
+
+    console.log("✅ Token created via success redirect:", token);
+
+    return res.json({ token });
+
+  } catch (err) {
+    console.error("❌ Session verification failed:", err.message);
+    return res.status(500).json({ error: "Session verification failed" });
+  }
 });
 
 app.get("/access", (req, res) => {
