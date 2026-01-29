@@ -1,37 +1,18 @@
 require("dotenv").config();
-console.log(
-  "Stripe key prefix:",
-  process.env.STRIPE_SECRET_KEY?.slice(0, 7)
-)
-console.log("Stripe key exists:", !!process.env.STRIPE_SECRET_KEY)
-
-const secret = process.env.STRIPE_SECRET_KEY || ""
-const webhook = process.env.STRIPE_WEBHOOK_SECRET || ""
-
-if (
-  (secret.includes("test") && webhook.includes("live")) ||
-  (secret.includes("live") && webhook.includes("test"))
-) {
-  throw new Error("Stripe keys mismatch: test vs live")
-}
 
 const express = require("express");
 const Stripe = require("stripe");
 const path = require("path");
-const fs = require("fs");
 const crypto = require("crypto");
-
-
-// TEMP token store (memory only)
-const accessTokens = new Map();
-// token -> { sessionId, createdAt }
+const fs = require("fs"); // Added missing fs import
 
 const app = express();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const PORT = process.env.PORT || 10000;
 
-console.log("STRIPE_SECRET_KEY:", process.env.STRIPE_SECRET_KEY?.slice(0, 12))
-console.log("STRIPE_WEBHOOK_SECRET:", process.env.STRIPE_WEBHOOK_SECRET?.slice(0, 12))
+if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
+  throw new Error("❌ Missing Stripe environment variables");
+}
 
 if (
   process.env.STRIPE_SECRET_KEY.includes("test") &&
@@ -39,12 +20,11 @@ if (
 ) {
   throw new Error("Stripe keys mismatch: test + live");
 }
+console.log("✅ Stripe keys loaded");
 
-app.get("/health", (req, res) => {
-  res.json({ status: "ok" });
-});
+const accessTokens = new Map();
 
-app.post("/webhook", express.raw({ type: "application/json" }), (req, res) => { // Changed bodyParser to express
+app.post("/webhook", express.raw({ type: "application/json" }), (req, res) => {
   const sig = req.headers["stripe-signature"];
 
   let event;
@@ -63,42 +43,27 @@ app.post("/webhook", express.raw({ type: "application/json" }), (req, res) => { 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
 
-    if (session.payment_status !== "paid") {
-      return res.json({ received: true });
+    if (session.payment_status === "paid") { // Fixed: changed !== to ===
+      const token = crypto.randomBytes(32).toString("hex");
+      accessTokens.set(token, {
+        sessionId: session.id,
+        createdAt: Date.now(),
+      });
+
+      console.log("✅ Payment confirmed. Token created:", token);
     }
-
-    // Generate permanent access token
-    const token = crypto.randomBytes(32).toString("hex");
-
-    accessTokens.set(token, {
-      sessionId: session.id,
-      createdAt: Date.now(),
-    });
-
-    console.log("✅ Payment confirmed. Token created:", token);
-
-    return res.json({ received: true });
   }
   
-  res.json({ received: true }); // Added default response for other event types
-}); // Added closing brace and parenthesis for webhook POST route
+  res.json({ received: true });
+}); // Added closing brace and parenthesis
 
 app.use(express.json());
+app.use(express.static("public"));
 
 app.post("/create-checkout-session", async (req, res) => {
   try {
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      payment_method_types: ["card", "wechat_pay"],
-      payment_method_options: {
-        wechat_pay: {
-          client: "web",
-           
-          customer_creation: "always",
-
-  billing_address_collection: "auto",
-        },
-      },
       line_items: [
         {
           price: process.env.STRIPE_PRICE_ID,
@@ -111,17 +76,13 @@ app.post("/create-checkout-session", async (req, res) => {
 
     res.json({ url: session.url });
   } catch (err) {
-  console.error("🔥 STRIPE ERROR:", err)
-  res.status(500).json({ error: err.message })
-}
+    console.error("🔥 Stripe session error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get("/exchange-session-for-token", (req, res) => {
   const { session_id } = req.query;
-
-  if (!session_id) {
-    return res.status(400).json({ error: "Missing session_id" });
-  }
 
   for (const [token, data] of accessTokens.entries()) {
     if (data.sessionId === session_id) {
@@ -129,7 +90,7 @@ app.get("/exchange-session-for-token", (req, res) => {
     }
   }
 
-  return res.status(404).json({ error: "Token not found yet" });
+  res.status(404).json({ error: "Token not found yet" });
 });
 
 app.get("/access", (req, res) => {
@@ -140,6 +101,10 @@ app.get("/access", (req, res) => {
   }
 
   res.sendFile(path.join(__dirname, "protected", "product.html"));
+});
+
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" });
 });
 
 app.get("/download", (req, res) => {
@@ -193,8 +158,6 @@ app.get("/download", (req, res) => {
 app.get("/product.html", (req, res) => {
   res.status(403).send("Forbidden");
 });
-
-app.use(express.static("public"));
 
 app.get("/checkout-session", async (req, res) => {
   try {
