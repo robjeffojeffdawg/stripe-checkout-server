@@ -10,12 +10,12 @@
 
   <script>
     const params = new URLSearchParams(window.location.search)
-    const sessionId = params.get("session_id")
+ const token = params.get("token")
 
-    if (!sessionId) {
-      document.body.innerHTML = "❌ Missing session ID"
-      throw new Error("No session_id in URL")
-    }
+  if (!token) {
+  document.body.innerHTML = "❌ Invalid or missing access token."
+  throw new Error("No token found")
+}
 
     async function fetchToken(retries = 10) {
       try {
@@ -26,7 +26,7 @@
         if (!data.token) throw new Error("No token returned")
 
         // ✅ Redirect to protected content
-        window.location.href = `/access?token=${data.token}`
+        window.location.href = `/protected/product.html?token=${token}`
 
      } catch (err) {
   document.body.innerHTML = "❌ We couldn’t unlock access automatically. Please refresh this page."

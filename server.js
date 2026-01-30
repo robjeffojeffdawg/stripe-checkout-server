@@ -24,38 +24,29 @@ console.log("✅ Stripe keys loaded");
 
 const accessTokens = new Map();
 
-app.post("/webhook", express.raw({ type: "application/json" }), (req, res) => {
-  const sig = req.headers["stripe-signature"];
+app.post(
+  "/webhook",
+  express.raw({ type: "application/json" }),
+  (req, res) => {
+    const sig = req.headers["stripe-signature"]
 
-  let event;
+    let event
 
-  try {
-    event = stripe.webhooks.constructEvent(
-      req.body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
-  } catch (err) {
-    console.error("❌ Webhook signature failed:", err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
-
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object;
-
-    if (session.payment_status === "paid") { // Fixed: changed !== to ===
-      const token = crypto.randomBytes(32).toString("hex");
-      accessTokens.set(token, {
-        sessionId: session.id,
-        createdAt: Date.now(),
-      });
-
-      console.log("✅ Payment confirmed. Token created:", token);
+    try {
+      event = stripe.webhooks.constructEvent(
+        req.body, // ✅ RAW BUFFER
+        sig,
+        process.env.STRIPE_WEBHOOK_SECRET
+      )
+    } catch (err) {
+      console.error("❌ Webhook signature verification failed.", err.message)
+      return res.status(400).send(`Webhook Error: ${err.message}`)
     }
+
+    // handle event here
+    res.json({ received: true })
   }
-  
-  res.json({ received: true });
-}); // Added closing brace and parenthesis
+)
 
 app.use(express.json());
 app.use(express.static("public"));
