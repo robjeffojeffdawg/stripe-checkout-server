@@ -42,6 +42,23 @@ app.post(
       console.error("❌ Webhook signature verification failed.", err.message)
       return res.status(400).send(`Webhook Error: ${err.message}`)
     }
+    console.log("🔔 Webhook event:", event.type)
+
+if (event.type === "checkout.session.completed") {
+  const session = event.data.object
+
+  if (session.payment_status !== "paid") {
+    return res.json({ received: true })
+  }
+
+  const token = crypto.randomBytes(32).toString("hex")
+
+  sessionTokens.set(session.id, token)
+
+  console.log("✅ Token created for session:", session.id)
+
+  return res.json({ received: true })
+}
 
     // handle event here
     res.json({ received: true })
@@ -72,44 +89,21 @@ app.post("/create-checkout-session", async (req, res) => {
   }
 });
 
-app.get("/exchange-session-for-token", async (req, res) => {
-  const { session_id } = req.query;
+app.get("/exchange-session-for-token", (req, res) => {
+  const { session_id } = req.query
 
   if (!session_id) {
-    return res.status(400).json({ error: "Missing session_id" });
+    return res.status(400).json({ error: "Missing session_id" })
   }
 
-  try {
-    const session = await stripe.checkout.sessions.retrieve(session_id);
+  const token = sessionTokens.get(session_id)
 
-    if (session.payment_status !== "paid") {
-      return res.status(403).json({ error: "Payment not completed" });
-    }
-
-    // 🔑 Reuse token if already created
-    for (const [token, data] of accessTokens.entries()) {
-      if (data.sessionId === session_id) {
-        return res.json({ token });
-      }
-    }
-
-    // 🔑 Create token NOW (no webhook dependency)
-    const token = crypto.randomBytes(32).toString("hex");
-
-    accessTokens.set(token, {
-      sessionId: session.id,
-      createdAt: Date.now(),
-    });
-
-    console.log("✅ Token created via success redirect:", token);
-
-    return res.json({ token });
-
-  } catch (err) {
-    console.error("❌ Session verification failed:", err.message);
-    return res.status(500).json({ error: "Session verification failed" });
+  if (!token) {
+    return res.status(404).json({ error: "Token not ready yet" })
   }
-});
+
+  res.json({ token })
+})
 
 app.get("/access", (req, res) => {
   const { token } = req.query;
