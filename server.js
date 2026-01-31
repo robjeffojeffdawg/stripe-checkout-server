@@ -10,8 +10,20 @@ const app = express();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const PORT = process.env.PORT || 10000;
 
-if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
-  throw new Error("❌ Missing Stripe environment variables");
+console.log("ENV CHECK", {
+  STRIPE_SECRET_KEY: !!process.env.STRIPE_SECRET_KEY,
+  STRIPE_WEBHOOK_SECRET: !!process.env.STRIPE_WEBHOOK_SECRET,
+  STRIPE_PRICE_ID: !!process.env.STRIPE_PRICE_ID,
+  BASE_URL: !!process.env.BASE_URL,
+})
+
+if (
+  !process.env.STRIPE_SECRET_KEY ||
+  !process.env.STRIPE_WEBHOOK_SECRET ||
+  !process.env.STRIPE_PRICE_ID ||
+  !process.env.BASE_URL
+) {
+  throw new Error("❌ Missing Stripe environment variables")
 }
 
 if (
@@ -24,7 +36,7 @@ console.log("✅ Stripe keys loaded");
 
 const accessTokens = new Map();
 
-app.post(
+app.use(
   "/webhook",
   express.raw({ type: "application/json" }),
   (req, res) => {
