@@ -36,38 +36,36 @@ console.log("✅ Stripe keys loaded");
 
 const accessTokens = new Map();
 
-app.use(
+app.post(
   "/webhook",
   express.raw({ type: "application/json" }),
   (req, res) => {
     const sig = req.headers["stripe-signature"]
-
     let event
 
     try {
       event = stripe.webhooks.constructEvent(
-        req.body, // ✅ RAW BUFFER
+        req.body,
         sig,
         process.env.STRIPE_WEBHOOK_SECRET
       )
     } catch (err) {
-      console.error("❌ Webhook signature verification failed.", err.message)
+      console.error("❌ Webhook signature verification failed:", err.message)
       return res.status(400).send(`Webhook Error: ${err.message}`)
     }
+
     console.log("🔔 Webhook event:", event.type)
 
-if (event.type === "checkout.session.completed") {
-  const session = event.data.object
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object
+      const token = crypto.randomBytes(32).toString("hex")
+      sessionTokens.set(session.id, token)
+      console.log("✅ Token created for session:", session.id)
+    }
 
-  if (session.payment_status !== "paid") {
-    return res.json({ received: true })
+    res.json({ received: true })
   }
-
-  const token = crypto.randomBytes(32).toString("hex")
-
-  sessionTokens.set(session.id, token)
-
-  console.log("✅ Token created for session:", session.id)
+)
 
   return res.json({ received: true })
 }
