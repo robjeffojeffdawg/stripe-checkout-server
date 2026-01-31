@@ -4,18 +4,20 @@ const express = require("express");
 const Stripe = require("stripe");
 const path = require("path");
 const crypto = require("crypto");
-const fs = require("fs"); // Added missing fs import
+const fs = require("fs");
 
 const app = express();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const PORT = process.env.PORT || 10000;
+
+const sessionTokens = new Map();
 
 console.log("ENV CHECK", {
   STRIPE_SECRET_KEY: !!process.env.STRIPE_SECRET_KEY,
   STRIPE_WEBHOOK_SECRET: !!process.env.STRIPE_WEBHOOK_SECRET,
   STRIPE_PRICE_ID: !!process.env.STRIPE_PRICE_ID,
   BASE_URL: !!process.env.BASE_URL,
-})
+});
 
 if (
   !process.env.STRIPE_SECRET_KEY ||
@@ -23,7 +25,7 @@ if (
   !process.env.STRIPE_PRICE_ID ||
   !process.env.BASE_URL
 ) {
-  throw new Error("❌ Missing Stripe environment variables")
+  throw new Error("❌ Missing Stripe environment variables");
 }
 
 if (
@@ -35,45 +37,45 @@ if (
 console.log("✅ Stripe keys loaded");
 
 const accessTokens = new Map();
+const sessionTokens = new Map(); // Added missing Map
 
 app.post(
   "/webhook",
   express.raw({ type: "application/json" }),
   (req, res) => {
-    const sig = req.headers["stripe-signature"]
-    let event
+    const sig = req.headers["stripe-signature"];
+    let event;
 
     try {
       event = stripe.webhooks.constructEvent(
         req.body,
         sig,
         process.env.STRIPE_WEBHOOK_SECRET
-      )
+      );
     } catch (err) {
-      console.error("❌ Webhook signature verification failed:", err.message)
-      return res.status(400).send(`Webhook Error: ${err.message}`)
+      console.error("❌ Webhook signature verification failed:", err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    console.log("🔔 Webhook event:", event.type)
+    console.log("🔔 Webhook event:", event.type);
 
     if (event.type === "checkout.session.completed") {
-      const session = event.data.object
-      const token = crypto.randomBytes(32).toString("hex")
-      sessionTokens.set(session.id, token)
-      console.log("✅ Token created for session:", session.id)
+      const session = event.data.object;
+      const token = crypto.randomBytes(32).toString("hex");
+      
+      // Store in both Maps for compatibility
+      sessionTokens.set(session.id, token);
+      accessTokens.set(token, {
+        sessionId: session.id,
+        createdAt: Date.now(),
+      });
+      
+      console.log("✅ Token created for session:", session.id);
     }
 
-    res.json({ received: true })
+    res.json({ received: true });
   }
-)
-
-  return res.json({ received: true })
-}
-
-    // handle event here
-    res.json({ received: true })
-  }
-)
+);
 
 app.use(express.json());
 app.use(express.static("public"));
@@ -100,36 +102,37 @@ app.post("/create-checkout-session", async (req, res) => {
 });
 
 app.get("/exchange-session-for-token", (req, res) => {
-  const { session_id } = req.query
+  const { session_id } = req.query;
 
   if (!session_id) {
-    return res.status(400).json({ error: "Missing session_id" })
+    return res.status(400).json({ error: "Missing session_id" });
   }
 
-  const token = sessionTokens.get(session_id)
+  const token = sessionTokens.get(session_id);
 
   if (!token) {
-    return res.status(404).json({ error: "Token not ready yet" })
+    return res.status(404).json({ error: "Token not ready yet" });
   }
 
-  res.json({ token })
-})
+  res.json({ token });
+});
 
 app.get("/access", (req, res) => {
   const { token } = req.query;
 
-  const data = accessTokens.get(token)
+  const data = accessTokens.get(token);
 
-if (!data) {
-  return res.status(403).send("❌ Invalid access link");
-}
+  if (!data) {
+    return res.status(403).send("❌ Invalid access link");
+  }
 
-// optional: 24h expiry
-const MAX_AGE = 24 * 60 * 60 * 1000
-if (Date.now() - data.createdAt > MAX_AGE) {
-  accessTokens.delete(token)
-  return res.status(403).send("❌ Access link expired");
-}
+  // optional: 24h expiry
+  const MAX_AGE = 24 * 60 * 60 * 1000;
+  if (Date.now() - data.createdAt > MAX_AGE) {
+    accessTokens.delete(token);
+    return res.status(403).send("❌ Access link expired");
+  }
+  
   res.sendFile(path.join(__dirname, "protected", "product.html"));
 });
 
