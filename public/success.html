@@ -8,37 +8,53 @@
   <p>Your payment has been confirmed.</p>
   <p>We’re preparing your access now — you’ll be redirected automatically.</p>
 
-  <script>
-    const params = new URLSearchParams(window.location.search)
- const token = params.get("token")
+ <script>
+  const params = new URLSearchParams(window.location.search)
+  const sessionId = params.get("session_id")
 
-  if (!token) {
-  document.body.innerHTML = "❌ Invalid or missing access token."
-  throw new Error("No token found")
-}
+  if (!sessionId) {
+    document.body.innerHTML = "❌ Missing session ID."
+    throw new Error("No session_id in URL")
+  }
 
-    async function fetchToken(retries = 10) {
-      try {
-        const res = await fetch(`/exchange-session-for-token?session_id=${sessionId}`)
-        if (!res.ok) throw new Error("Token not ready")
+  let attempts = 0
+  const MAX_ATTEMPTS = 10
 
-        const data = await res.json()
-        if (!data.token) throw new Error("No token returned")
+  async function fetchToken() {
+    try {
+      const res = await fetch(
+        `/exchange-session-for-token?session_id=${sessionId}`
+      )
 
-        // ✅ Redirect to protected content
-        window.location.href = `/protected/product.html?token=${token}`
+      if (!res.ok) {
+        throw new Error("Token not ready")
+      }
 
-     } catch (err) {
-  document.body.innerHTML = "❌ We couldn’t unlock access automatically. Please refresh this page."
-  return
-}
+      const data = await res.json()
 
-        }
+      if (!data.token) {
+        throw new Error("No token returned")
+      }
 
-        // wait 1 second and retry
-        setTimeout(() => fetchToken(retries - 1), 1000)
+      // ✅ SUCCESS → redirect using the token returned by backend
+      window.location.href = `/access?token=${data.token}`
 
-    fetchToken()
-  </script>
+    } catch (err) {
+      attempts++
+
+      if (attempts >= MAX_ATTEMPTS) {
+        document.body.innerHTML =
+          "❌ Access not ready yet. Please refresh this page in a moment."
+        return
+      }
+
+      // retry after 1 second
+      setTimeout(fetchToken, 1000)
+    }
+  }
+
+  fetchToken()
+</script>
+
 </body>
 </html>
