@@ -1,3 +1,5 @@
+// Secure one-time Stripe Checkout with token-based digital delivery
+
 require("dotenv").config()
 
 const express = require("express")
@@ -13,13 +15,6 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 // 🔑 SINGLE SOURCE OF TRUTH
 const sessionTokens = new Map() // sessionId -> token
 const accessTokens = new Map()  // token -> metadata
-
-console.log("ENV CHECK", {
-  STRIPE_SECRET_KEY: !!process.env.STRIPE_SECRET_KEY,
-  STRIPE_WEBHOOK_SECRET: !!process.env.STRIPE_WEBHOOK_SECRET,
-  STRIPE_PRICE_ID: !!process.env.STRIPE_PRICE_ID,
-  BASE_URL: !!process.env.BASE_URL,
-})
 
 if (
   !process.env.STRIPE_SECRET_KEY ||
@@ -135,21 +130,16 @@ app.get("/access", (req, res) => {
 // =====================
 
 app.get("/download", (req, res) => {
-  const { file, token } = req.query
+  const { token, file } = req.query
 
-  const data = accessTokens.get(token)
-  if (!data) {
-    return res.status(403).send("❌ Invalid token")
+  if (!token || !sessionTokens.has(token)) {
+    return res.status(404).send("❌ Invalid or expired access token.")
   }
 
-  const ALLOWED_FILES = ["premium.zip"]
-  if (!ALLOWED_FILES.includes(file)) {
-    return res.status(403).send("❌ File not allowed")
-  }
+  const filePath = path.join(__dirname, "protected", file)
 
-  const filePath = path.join(__dirname, "downloads", file)
   if (!fs.existsSync(filePath)) {
-    return res.status(404).send("File missing")
+    return res.status(404).send("❌ File not found.")
   }
 
   res.download(filePath)
