@@ -71,6 +71,12 @@ app.get('/setup-complete', async (req, res) => {
 app.use(express.json())
 app.use(express.static("public"))
 
+app.get('/config', (req, res) => {
+  res.json({
+    publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
+  });
+});
+
 async function getStripeCustomerIdFromDB(userId) {
   const result = await pool.query(
     'SELECT stripe_customer_id FROM users WHERE id = $1',

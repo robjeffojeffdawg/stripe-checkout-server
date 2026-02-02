@@ -1,4 +1,6 @@
-const stripe = Stripe('pk_test_XXXX'); // your publishable key
+const { publishableKey } = await fetch('/config').then(r => r.json());
+
+const stripe = Stripe(publishableKey);
 
 async function init() {
   // 1️⃣ Ask backend for SetupIntent
