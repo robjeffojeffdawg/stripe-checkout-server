@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Add payment method</title>
+  <script src="https://js.stripe.com/v3/"></script>
+  <style>
+    body { font-family: system-ui; padding: 40px; }
+    #payment-element { margin-bottom: 20px; }
+    button { padding: 12px 20px; font-size: 16px; }
+  </style>
+</head>
+<body>
+
+  <h2>Add a payment method</h2>
+  <div id="payment-element"></div>
+  <button id="submit">Save card</button>
+
+  <div id="error"></div>
+
+  <script src="/payment-element.js"></script>
+</body>
+</html>

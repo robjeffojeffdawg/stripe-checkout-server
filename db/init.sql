@@ -7,4 +7,7 @@ CREATE TABLE access_tokens (
   expires_at TIMESTAMP NOT NULL,
   used INTEGER NOT NULL DEFAULT 0,
   max_uses INTEGER NOT NULL DEFAULT 5
+
+  ALTER TABLE users
+ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT;
 );

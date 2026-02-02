@@ -2,6 +2,8 @@
 
 require("dotenv").config()
 
+import { pool } from './db.js';
+
 const express = require("express")
 const Stripe = require("stripe")
 const path = require("path")
@@ -27,51 +29,58 @@ if (
 
 console.log("✅ Stripe keys loaded")
 
-// =====================
-// 🔔 STRIPE WEBHOOK
-// =====================
-app.post(
-  "/webhook",
-  express.raw({ type: "application/json" }),
-  (req, res) => {
-    const sig = req.headers["stripe-signature"]
-    let event
+app.get('/setup-complete', async (req, res) => {
+  const { setup_intent } = req.query;
 
-    try {
-      event = stripe.webhooks.constructEvent(
-        req.body,
-        sig,
-        process.env.STRIPE_WEBHOOK_SECRET
-      )
-    } catch (err) {
-      console.error("❌ Webhook signature failed:", err.message)
-      return res.status(400).send(`Webhook Error`)
-    }
-
-    console.log("🔔 Webhook event:", event.type)
-
-    if (event.type === "checkout.session.completed") {
-      const session = event.data.object
-      const token = crypto.randomBytes(32).toString("hex")
-
-      sessionTokens.set(session.id, token)
-      accessTokens.set(token, {
-        sessionId: session.id,
-        createdAt: Date.now(),
-      })
-
-      console.log("✅ Token created for session:", session.id)
-    }
-
-    res.json({ received: true })
+  if (!setup_intent) {
+    return res.status(400).send('Missing setup_intent');
   }
-)
+
+  try {
+    const setupIntent = await stripe.setupIntents.retrieve(setup_intent);
+
+    if (!setupIntent.payment_method) {
+      // ❌ Redirect-only UnionPay or unsupported card
+      return res.send(`
+        <h2>Card could not be saved</h2>
+        <p>This card cannot be saved for future payments.</p>
+        <p>Please try another card.</p>
+      `);
+    }
+
+    // ✅ Card saved successfully
+    return res.send(`
+      <h2>Card saved successfully</h2>
+      <p>You can now proceed.</p>
+    `);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Error checking card');
+  }
+});
 
 // =====================
 // NORMAL MIDDLEWARE
 // =====================
 app.use(express.json())
 app.use(express.static("public"))
+
+async function getStripeCustomerIdFromDB(userId) {
+  const result = await pool.query(
+    'SELECT stripe_customer_id FROM users WHERE id = $1',
+    [userId]
+  );
+
+  return result.rows[0]?.stripe_customer_id || null;
+}
+
+async function saveStripeCustomerIdToDB(userId, customerId) {
+  await pool.query(
+    'UPDATE users SET stripe_customer_id = $1 WHERE id = $2',
+    [customerId, userId]
+  );
+}
 
 // =====================
 // CREATE CHECKOUT
@@ -91,6 +100,37 @@ app.post("/create-checkout-session", async (req, res) => {
     res.status(500).json({ error: err.message })
   }
 })
+
+app.post('/create-setup-intent', async (req, res) => {
+  try {
+    const { email, userId } = req.body;
+
+    // 1️⃣ Retrieve or create Stripe Customer
+    let customerId = await getStripeCustomerIdFromDB(userId);
+
+    if (!customerId) {
+      const customer = await stripe.customers.create({ email });
+      customerId = customer.id;
+      await saveStripeCustomerIdToDB(userId, customerId);
+    }
+
+    // 2️⃣ Create SetupIntent (CARD ONLY)
+    const setupIntent = await stripe.setupIntents.create({
+      customer: customerId,
+      payment_method_types: ['card'], // CRITICAL
+      usage: 'off_session',
+    });
+
+    // 3️⃣ Return client secret
+    res.json({
+      clientSecret: setupIntent.client_secret,
+    });
+
+  } catch (err) {
+    console.error('SetupIntent error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // =====================
 // SESSION → TOKEN
@@ -146,6 +186,45 @@ app.get("/download", (req, res) => {
 })
 
 // =====================
+// 🔔 STRIPE WEBHOOK
+// =====================
+app.post(
+  "/webhook",
+  express.raw({ type: "application/json" }),
+  (req, res) => {
+    const sig = req.headers["stripe-signature"]
+    let event
+
+    try {
+      event = stripe.webhooks.constructEvent(
+        req.body,
+        sig,
+        process.env.STRIPE_WEBHOOK_SECRET
+      )
+    } catch (err) {
+      console.error("❌ Webhook signature failed:", err.message)
+      return res.status(400).send(`Webhook Error`)
+    }
+
+    console.log("🔔 Webhook event:", event.type)
+
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object
+      const token = crypto.randomBytes(32).toString("hex")
+
+      sessionTokens.set(session.id, token)
+      accessTokens.set(token, {
+        sessionId: session.id,
+        createdAt: Date.now(),
+      })
+
+      console.log("✅ Token created for session:", session.id)
+    }
+
+    res.json({ received: true })
+  }
+)
+
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Server running on port ${PORT}`)
 })
