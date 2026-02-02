@@ -1,14 +1,19 @@
-// Secure one-time Stripe Checkout with token-based digital delivery
+import express from "express";
+import Stripe from "stripe";
+import path from "path";
+import crypto from "crypto";
+import fs from "fs";
+import dotenv from "dotenv";
 
-require("dotenv").config()
+dotenv.config();
 
 import { pool } from './db.js';
 
-const express = require("express")
-const Stripe = require("stripe")
-const path = require("path")
-const crypto = require("crypto")
-const fs = require("fs")
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const app = express()
 const PORT = process.env.PORT || 10000
