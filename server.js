@@ -82,6 +82,41 @@ async function saveStripeCustomerIdToDB(userId, customerId) {
   );
 }
 
+app.post('/create-setup-intent', async (req, res) => {
+  try {
+    const userId = 'unionpay_client_001';
+const email = 'client@email.com';
+
+    // 2️⃣ check if we already have a Stripe customer
+    let customerId = await getStripeCustomerIdFromDB(userId);
+
+    // 3️⃣ if not, create one ONCE
+    if (!customerId) {
+      const customer = await stripe.customers.create({ email });
+      customerId = customer.id;
+
+      // 4️⃣ persist the mapping
+      await saveStripeCustomerIdToDB(userId, customerId);
+    }
+
+    // 5️⃣ create SetupIntent using THAT customer
+    const setupIntent = await stripe.setupIntents.create({
+      customer: customerId,
+      payment_method_types: ['card'],
+      usage: 'off_session',
+    });
+
+    // 6️⃣ return client secret
+    res.json({
+      clientSecret: setupIntent.client_secret,
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // =====================
 // CREATE CHECKOUT
 // =====================
@@ -100,37 +135,6 @@ app.post("/create-checkout-session", async (req, res) => {
     res.status(500).json({ error: err.message })
   }
 })
-
-app.post('/create-setup-intent', async (req, res) => {
-  try {
-    const { email, userId } = req.body;
-
-    // 1️⃣ Retrieve or create Stripe Customer
-    let customerId = await getStripeCustomerIdFromDB(userId);
-
-    if (!customerId) {
-      const customer = await stripe.customers.create({ email });
-      customerId = customer.id;
-      await saveStripeCustomerIdToDB(userId, customerId);
-    }
-
-    // 2️⃣ Create SetupIntent (CARD ONLY)
-    const setupIntent = await stripe.setupIntents.create({
-      customer: customerId,
-      payment_method_types: ['card'], // CRITICAL
-      usage: 'off_session',
-    });
-
-    // 3️⃣ Return client secret
-    res.json({
-      clientSecret: setupIntent.client_secret,
-    });
-
-  } catch (err) {
-    console.error('SetupIntent error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // =====================
 // SESSION → TOKEN
