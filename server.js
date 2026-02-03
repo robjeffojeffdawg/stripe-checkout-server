@@ -44,24 +44,30 @@ app.get('/setup-complete', async (req, res) => {
   try {
     const setupIntent = await stripe.setupIntents.retrieve(setup_intent);
 
+        // ❌ Card NOT saved (redirect-only UnionPay)
     if (!setupIntent.payment_method) {
-      // ❌ Redirect-only UnionPay or unsupported card
       return res.send(`
         <h2>Card could not be saved</h2>
         <p>This card cannot be saved for future payments.</p>
-        <p>Please try another card.</p>
+        <p>Please use Checkout instead.</p>
       `);
     }
 
-    // ✅ Card saved successfully
+    // ✅ Card saved — persist it
+    const userId = 'unionpay_client_001'; // TEMP shortcut
+    await savePaymentMethodToDB(
+      userId,
+      setupIntent.payment_method
+    );
+
     return res.send(`
-      <h2>Card saved successfully</h2>
-      <p>You can now proceed.</p>
+      <h2>✅ Card saved successfully</h2>
+      <p>You can now be charged automatically.</p>
     `);
 
   } catch (err) {
     console.error(err);
-    res.status(500).send('Error checking card');
+    res.status(500).send('Error verifying card');
   }
 });
 
@@ -90,6 +96,13 @@ async function saveStripeCustomerIdToDB(userId, customerId) {
   await pool.query(
     'UPDATE users SET stripe_customer_id = $1 WHERE id = $2',
     [customerId, userId]
+  );
+}
+
+async function savePaymentMethodToDB(userId, paymentMethodId) {
+  await pool.query(
+    'UPDATE users SET stripe_payment_method_id = $1 WHERE id = $2',
+    [paymentMethodId, userId]
   );
 }
 

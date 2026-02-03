@@ -10,4 +10,7 @@ CREATE TABLE access_tokens (
 
   ALTER TABLE users
 ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT;
+ALTER TABLE users
+ADD COLUMN stripe_payment_method_id TEXT;
+
 );

@@ -2,59 +2,82 @@
 <html>
 <head>
   <title>Payment successful</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      text-align: center;
+      padding-top: 60px;
+    }
+
+    .spinner {
+      margin: 20px auto;
+      width: 40px;
+      height: 40px;
+      border: 4px solid #ddd;
+      border-top-color: #000;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
 </head>
+
 <body>
   <h1>✅ Payment successful</h1>
   <p>Your payment has been confirmed.</p>
-  <p>We’re preparing your access now — you’ll be redirected automatically.</p>
+  <p id="status">
+    We’re preparing your access now — you’ll be redirected automatically.
+  </p>
 
- <script>
-  const params = new URLSearchParams(window.location.search)
-  const sessionId = params.get("session_id")
+  <div class="spinner"></div>
 
-  if (!sessionId) {
-    document.body.innerHTML = "❌ Missing session ID."
-    throw new Error("No session_id in URL")
-  }
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get("session_id");
 
-  let attempts = 0
-  const MAX_ATTEMPTS = 10
-
-  async function fetchToken() {
-    try {
-      const res = await fetch(
-        `/exchange-session-for-token?session_id=${sessionId}`
-      )
-
-      if (!res.ok) {
-        throw new Error("Token not ready")
-      }
-
-      const data = await res.json()
-
-      if (!data.token) {
-        throw new Error("No token returned")
-      }
-
-      // ✅ SUCCESS → redirect using the token returned by backend
-      window.location.href = `/access?token=${data.token}`
-
-    } catch (err) {
-      attempts++
-
-      if (attempts >= MAX_ATTEMPTS) {
-        document.body.innerHTML =
-          "❌ Access not ready yet. Please refresh this page in a moment."
-        return
-      }
-
-      // retry after 1 second
-      setTimeout(fetchToken, 1000)
+    if (!sessionId) {
+      document.getElementById("status").innerText =
+        "❌ Missing session ID. Please contact support.";
+      throw new Error("No session_id in URL");
     }
-  }
 
-  fetchToken()
-</script>
+    let attempts = 0;
+    const MAX_ATTEMPTS = 15; // ~15 seconds total
 
+    async function pollForToken() {
+      try {
+        const res = await fetch(
+          `/exchange-session-for-token?session_id=${sessionId}`
+        );
+
+        if (!res.ok) throw new Error("Token not ready");
+
+        const data = await res.json();
+
+        if (!data.token) throw new Error("No token yet");
+
+        // ✅ SUCCESS → redirect
+        window.location.href = `/access?token=${data.token}`;
+
+      } catch (err) {
+        attempts++;
+        console.log(`⏳ Waiting for access token (${attempts})`);
+
+        if (attempts >= MAX_ATTEMPTS) {
+          document.querySelector(".spinner").remove();
+          document.getElementById("status").innerText =
+            "❌ Access is still being prepared. Please refresh this page in a moment.";
+          return;
+        }
+
+        setTimeout(pollForToken, 1000);
+      }
+    }
+
+    pollForToken();
+  </script>
 </body>
 </html>
