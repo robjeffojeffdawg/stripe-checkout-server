@@ -44,30 +44,33 @@ app.get('/setup-complete', async (req, res) => {
   try {
     const setupIntent = await stripe.setupIntents.retrieve(setup_intent);
 
-        // ❌ Card NOT saved (redirect-only UnionPay)
+    console.log('🔍 SetupIntent result:', {
+      id: setupIntent.id,
+      status: setupIntent.status,
+      payment_method: setupIntent.payment_method,
+    });
+
+     // ❌ UnionPay / redirect-only / unsupported
     if (!setupIntent.payment_method) {
-      return res.send(`
-        <h2>Card could not be saved</h2>
-        <p>This card cannot be saved for future payments.</p>
-        <p>Please use Checkout instead.</p>
-      `);
+      console.warn('⚠️ Card could not be saved — fallback to Checkout');
+
+      return res.redirect('/fallback-checkout.html');
     }
 
-    // ✅ Card saved — persist it
-    const userId = 'unionpay_client_001'; // TEMP shortcut
-    await savePaymentMethodToDB(
-      userId,
-      setupIntent.payment_method
-    );
+    // ✅ Card SAVED
+    const userId = 'unionpay_client_001'; // temporary shortcut
+    await savePaymentMethodToDB(userId, setupIntent.payment_method);
+
+    console.log('✅ Payment method saved:', setupIntent.payment_method);
 
     return res.send(`
       <h2>✅ Card saved successfully</h2>
-      <p>You can now be charged automatically.</p>
+      <p>You can now proceed.</p>
     `);
 
   } catch (err) {
-    console.error(err);
-    res.status(500).send('Error verifying card');
+    console.error('❌ setup-complete error:', err);
+    res.status(500).send('Error checking card');
   }
 });
 
@@ -111,34 +114,33 @@ app.post('/create-setup-intent', async (req, res) => {
     const userId = 'unionpay_client_001';
 const email = 'client@email.com';
 
-    // 2️⃣ check if we already have a Stripe customer
+  // 2️⃣ check if we already have a Stripe customer
     let customerId = await getStripeCustomerIdFromDB(userId);
 
-    // 3️⃣ if not, create one ONCE
+     // 3️⃣ if not, create one ONCE
     if (!customerId) {
       const customer = await stripe.customers.create({ email });
       customerId = customer.id;
-
+      
       // 4️⃣ persist the mapping
       await saveStripeCustomerIdToDB(userId, customerId);
-    }
+       }
 
-  // 2️⃣ Create Checkout Session (SETUP MODE)
+        // 2️⃣ Create Checkout Session (SETUP MODE)
     const session = await stripe.checkout.sessions.create({
       mode: 'setup',
       customer: customerId,
       payment_method_types: ['card'],
       success_url: `${process.env.BASE_URL}/setup-complete?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.BASE_URL}/add-payment-method`,
-      
-    })
+       });
 
-    console.log('🔍 Setup Checkout session created:', {
+        console.log('🔍 Setup Checkout session created:', {
   sessionId: session.id,
   customerId,
   email,
-})
-
+  });
+    
     // 3️⃣ Send hosted URL to frontend (or directly to client)
     res.json({ url: session.url })
 
@@ -147,7 +149,7 @@ const email = 'client@email.com';
     res.status(500).json({ error: err.message })
   }
 });
-
+  
 // =====================
 // CREATE CHECKOUT
 // =====================

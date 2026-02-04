@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Continue Payment</title>
+</head>
+<body>
+  <h2>⚠️ Card could not be saved</h2>
+  <p>Your card doesn’t support saving for future payments.</p>
+  <p>You can still continue using a standard checkout.</p>
+
+  <button id="continue">Continue to Checkout</button>
+
+  <script>
+    document.getElementById('continue').onclick = async () => {
+      const res = await fetch('/create-checkout-session', { method: 'POST' });
+      const data = await res.json();
+      window.location.href = data.url;
+    };
+  </script>
+</body>
+</html>
