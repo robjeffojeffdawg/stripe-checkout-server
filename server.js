@@ -243,6 +243,16 @@ app.post(
       return res.status(400).send(`Webhook Error`)
     }
 
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
+
+      console.log('✅ Setup Checkout completed:', {
+        sessionId: session.id,
+        setupIntentId: session.setup_intent,
+        customerId: session.customer,
+      });
+      }
+
     console.log("🔔 Webhook event:", event.type)
 
     if (event.type === "checkout.session.completed") {
