@@ -123,21 +123,28 @@ const email = 'client@email.com';
       await saveStripeCustomerIdToDB(userId, customerId);
     }
 
-    // 5️⃣ create SetupIntent using THAT customer
-    const setupIntent = await stripe.setupIntents.create({
+  // 2️⃣ Create Checkout Session (SETUP MODE)
+    const session = await stripe.checkout.sessions.create({
+      mode: 'setup',
       customer: customerId,
       payment_method_types: ['card'],
-      usage: 'off_session',
-    });
+      success_url: `${process.env.BASE_URL}/setup-complete?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.BASE_URL}/add-payment-method`,
+      
+    })
 
-    // 6️⃣ return client secret
-    res.json({
-      clientSecret: setupIntent.client_secret,
-    });
+    console.log('🔍 Setup Checkout session created:', {
+  sessionId: session.id,
+  customerId,
+  email,
+})
+
+    // 3️⃣ Send hosted URL to frontend (or directly to client)
+    res.json({ url: session.url })
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    console.error('❌ Setup checkout failed:', err)
+    res.status(500).json({ error: err.message })
   }
 });
 
@@ -239,7 +246,25 @@ app.post(
     if (event.type === "checkout.session.completed") {
       const session = event.data.object
       const token = crypto.randomBytes(32).toString("hex")
+ 
+      console.log('✅ Setup checkout completed:', {
+    sessionId: session.id,
+    customerId: session.customer,
+    setupIntent: session.setup_intent,
+    paymentStatus: session.payment_status,
+  })
 
+  if (event.type === 'setup_intent.setup_failed') {
+  const intent = event.data.object
+
+  console.log('❌ SetupIntent FAILED:', {
+    setupIntentId: intent.id,
+    customerId: intent.customer,
+    failureReason: intent.last_setup_error?.message,
+    failureCode: intent.last_setup_error?.code,
+    paymentMethod: intent.payment_method,
+  })
+}
       sessionTokens.set(session.id, token)
       accessTokens.set(token, {
         sessionId: session.id,
