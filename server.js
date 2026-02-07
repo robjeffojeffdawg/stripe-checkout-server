@@ -80,8 +80,6 @@ app.get('/setup-complete', async (req, res) => {
 app.use(express.json())
 app.use(express.static("public"))
 
-import path from "path";
-
 // Terms
 app.get("/terms", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "terms.html"));
