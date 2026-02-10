@@ -34,46 +34,6 @@ if (
 
 console.log("✅ Stripe keys loaded")
 
-app.get('/setup-complete', async (req, res) => {
-  const { setup_intent } = req.query;
-
-  if (!setup_intent) {
-    return res.status(400).send('Missing setup_intent');
-  }
-
-  try {
-    const setupIntent = await stripe.setupIntents.retrieve(setup_intent);
-
-    console.log('🔍 SetupIntent result:', {
-      id: setupIntent.id,
-      status: setupIntent.status,
-      payment_method: setupIntent.payment_method,
-    });
-
-     // ❌ UnionPay / redirect-only / unsupported
-    if (!setupIntent.payment_method) {
-      console.warn('⚠️ Card could not be saved — fallback to Checkout');
-
-      return res.redirect('/fallback-checkout.html');
-    }
-
-    // ✅ Card SAVED
-    const userId = 'unionpay_client_001'; // temporary shortcut
-    await savePaymentMethodToDB(userId, setupIntent.payment_method);
-
-    console.log('✅ Payment method saved:', setupIntent.payment_method);
-
-    return res.send(`
-      <h2>✅ Card saved successfully</h2>
-      <p>You can now proceed.</p>
-    `);
-
-  } catch (err) {
-    console.error('❌ setup-complete error:', err);
-    res.status(500).send('Error checking card');
-  }
-});
-
 // =====================
 // NORMAL MIDDLEWARE
 // =====================
@@ -125,65 +85,86 @@ async function savePaymentMethodToDB(userId, paymentMethodId) {
   );
 }
 
-app.post('/create-setup-intent', async (req, res) => {
+app.post("/create-setup-session", async (req, res) => {
   try {
-    const userId = 'unionpay_client_001';
-const email = 'client@email.com';
+    const userId = "unionpay_client_001";
+    const email = "client@email.com";
 
-  // 2️⃣ check if we already have a Stripe customer
+    const amount = Number(req.body.amount);
+
+    if (!Number.isInteger(amount) || amount < 1 || amount > 500) {
+      return res.status(400).json({ error: "Invalid amount" });
+    }
+
+    // Get or create customer
     let customerId = await getStripeCustomerIdFromDB(userId);
 
-     // 3️⃣ if not, create one ONCE
     if (!customerId) {
       const customer = await stripe.customers.create({ email });
       customerId = customer.id;
-      
-      // 4️⃣ persist the mapping
       await saveStripeCustomerIdToDB(userId, customerId);
-       }
+    }
 
-        // 2️⃣ Create Checkout Session (SETUP MODE)
+    // Create Checkout Session (SETUP MODE)
     const session = await stripe.checkout.sessions.create({
-      mode: 'setup',
+      mode: "setup",
       customer: customerId,
-      payment_method_types: ['card'],
-      success_url: `${process.env.BASE_URL}/setup-complete?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.BASE_URL}/add-payment-method`,
-       });
+      payment_method_types: ["card"],
 
-        console.log('🔍 Setup Checkout session created:', {
-  sessionId: session.id,
-  customerId,
-  email,
-  });
-    
-    // 3️⃣ Send hosted URL to frontend (or directly to client)
-    res.json({ url: session.url })
+      metadata: {
+        amount: amount
+      },
+
+      success_url: `${process.env.BASE_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.BASE_URL}/cancel`,
+    });
+
+    res.json({ url: session.url });
 
   } catch (err) {
-    console.error('❌ Setup checkout failed:', err)
-    res.status(500).json({ error: err.message })
+    console.error("❌ Setup session failed:", err);
+    res.status(500).json({ error: err.message });
   }
 });
-  
-// =====================
-// CREATE CHECKOUT
-// =====================
-app.post("/create-checkout-session", async (req, res) => {
-  try {
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      line_items: [{ price: process.env.STRIPE_PRICE_ID, quantity: 1 }],
-      success_url: `${process.env.BASE_URL}/success.html?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.BASE_URL}/cancel.html`,
-    })
 
-    res.json({ url: session.url })
+app.get("/success", async (req, res) => {
+  try {
+    const session = await stripe.checkout.sessions.retrieve(
+      req.query.session_id,
+      { expand: ["setup_intent"] }
+    );
+
+    const setupIntent = session.setup_intent;
+    const paymentMethod = setupIntent.payment_method;
+    const amount = Number(session.metadata.amount);
+
+    if (!amount || amount < 1) {
+      return res.status(400).send("Invalid amount");
+    }
+
+    // 🔴 This is where the actual CHARGE happens
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amount * 100,
+      currency: "usd",
+      customer: session.customer,
+      payment_method: paymentMethod,
+      off_session: true,
+      confirm: true,
+    });
+
+    // TODO: grant access here (token, DB flag, etc)
+
+    res.send("Payment successful. Access granted.");
+
   } catch (err) {
-    console.error("🔥 Stripe error:", err.message)
-    res.status(500).json({ error: err.message })
+    console.error("❌ Success handling failed:", err);
+    res.status(500).send("Something went wrong");
   }
-})
+});
+
+app.get("/cancel", (req, res) => {
+  res.send("Payment cancelled");
+});
 
 // =====================
 // SESSION → TOKEN

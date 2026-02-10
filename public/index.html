@@ -15,20 +15,22 @@
 
   <button onclick="pay()">Buy Premium</button>
 
+  <input type="number" id="amount" min="1" step="1" value="1" />
+<button id="pay">Continue</button>
+
 <script>
-  async function pay() {
-    const res = await fetch("/create-checkout-session", {
-      method: "POST",
-    });
+document.getElementById("pay").onclick = async () => {
+  const amount = Number(document.getElementById("amount").value);
 
-    const stripe = Stripe(
-      "pk_live_51HJeiVAG2360Iu0s6dng1ojfnokF0jN36Yb43iAbMMhouxcySmGca1GxgzqrnBH7a4DaUxep6t0xZgCvtfyxyojE00PVrvRWgr"
-    );
+  const res = await fetch("/create-setup-session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ amount })
+  });
 
-    const data = await res.json();
-    if (data.url) window.location.href = data.url;
-    else alert(data.error);
-  }
+  const { url } = await res.json();
+  window.location = url;
+};
 </script>
 
 <footer style="margin-top:40px; font-size:14px;">
