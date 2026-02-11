@@ -19,10 +19,6 @@ const app = express()
 const PORT = process.env.PORT || 10000
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
-// 🔑 SINGLE SOURCE OF TRUTH
-const sessionTokens = new Map() // sessionId -> token
-const accessTokens = new Map()  // token -> metadata
-
 if (
   !process.env.STRIPE_SECRET_KEY ||
   !process.env.STRIPE_WEBHOOK_SECRET ||
@@ -90,11 +86,11 @@ app.post("/create-setup-session", async (req, res) => {
     const userId = "unionpay_client_001";
     const email = "client@email.com";
 
-    const amount = Number(req.body.amount);
+  const amount = Number(req.body.amount);
 
-    if (!Number.isInteger(amount) || amount < 1 || amount > 500) {
-      return res.status(400).json({ error: "Invalid amount" });
-    }
+if (!amount || amount < 1) {
+  return res.status(400).json({ error: "Invalid amount" });
+}
 
     // Get or create customer
     let customerId = await getStripeCustomerIdFromDB(userId);
@@ -123,7 +119,7 @@ app.post("/create-setup-session", async (req, res) => {
 
   } catch (err) {
     console.error("❌ Setup session failed:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Checkout failed" });
   }
 });
 
@@ -197,8 +193,6 @@ app.get("/success", async (req, res) => {
 });
 
 app.get("/cancel", (req, res) => {
-  res.send("Payment cancelled");
-  app.get("/cancel", (req, res) => {
   res.send(`
     <!DOCTYPE html>
     <html lang="en">
@@ -223,13 +217,10 @@ app.get("/cancel", (req, res) => {
       <body>
         <h2>Payment not completed</h2>
         <p>No charge was made.</p>
-
-        <a href="/checkout.html">Try again</a>
+        <a href="/index.html">Try again</a>
       </body>
     </html>
   `);
-});
-
 });
 
 // =====================
@@ -292,66 +283,33 @@ app.post(
   "/webhook",
   express.raw({ type: "application/json" }),
   (req, res) => {
-    const sig = req.headers["stripe-signature"]
-    let event
+    const sig = req.headers["stripe-signature"];
+    let event;
 
     try {
       event = stripe.webhooks.constructEvent(
         req.body,
         sig,
         process.env.STRIPE_WEBHOOK_SECRET
-      )
+      );
     } catch (err) {
-      console.error("❌ Webhook signature failed:", err.message)
-      return res.status(400).send(`Webhook Error`)
+      console.error("❌ Webhook signature failed:", err.message);
+      return res.status(400).send("Webhook Error");
     }
-
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object;
-
-      console.log('✅ Setup Checkout completed:', {
-        sessionId: session.id,
-        setupIntentId: session.setup_intent,
-        customerId: session.customer,
-      });
-      }
-
-    console.log("🔔 Webhook event:", event.type)
 
     if (event.type === "checkout.session.completed") {
-      const session = event.data.object
-      const token = crypto.randomBytes(32).toString("hex")
- 
-      console.log('✅ Setup checkout completed:', {
-    sessionId: session.id,
-    customerId: session.customer,
-    setupIntent: session.setup_intent,
-    paymentStatus: session.payment_status,
-  })
+      const session = event.data.object;
 
-  if (event.type === 'setup_intent.setup_failed') {
-  const intent = event.data.object
-
-  console.log('❌ SetupIntent FAILED:', {
-    setupIntentId: intent.id,
-    customerId: intent.customer,
-    failureReason: intent.last_setup_error?.message,
-    failureCode: intent.last_setup_error?.code,
-    paymentMethod: intent.payment_method,
-  })
-}
-      sessionTokens.set(session.id, token)
-      accessTokens.set(token, {
+      console.log("✅ Checkout session completed:", {
         sessionId: session.id,
-        createdAt: Date.now(),
-      })
-
-      console.log("✅ Token created for session:", session.id)
+        customerId: session.customer,
+        setupIntent: session.setup_intent,
+      });
     }
 
-    res.json({ received: true })
+    res.json({ received: true });
   }
-)
+);
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Server running on port ${PORT}`)
