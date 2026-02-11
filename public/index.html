@@ -12,25 +12,47 @@
 
 <body>
   <h1>Choose a product</h1>
+  <ul>
+  <li>🔒 Secure payment via Stripe</li>
+  <li>💳 Card saved for future access</li>
+  <li>⚡ Takes less than 30 seconds</li>
+</ul>
 
   <button onclick="pay()">Buy Premium</button>
 
   <input type="number" id="amount" min="1" step="1" value="1" />
-<button id="pay">Continue</button>
+<button onclick="pay()">Continue to secure checkout</button>
+
+<button id="pay" onclick="pay()">Continue to secure checkout</button>
 
 <script>
-document.getElementById("pay").onclick = async () => {
-  const amount = Number(document.getElementById("amount").value);
+  async function pay() {
+    const button = document.getElementById("pay");
 
-  const res = await fetch("/create-setup-session", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ amount })
-  });
+    // ✅ Loading state (THIS is the part you asked about)
+    button.disabled = true;
+    button.innerText = "Redirecting to secure checkout…";
 
-  const { url } = await res.json();
-  window.location = url;
-};
+    const amount = document.getElementById("amount").value;
+
+    const res = await fetch("/create-setup-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount })
+    });
+const data = await res.json();
+
+if (data.url) {
+  window.location.href = data.url;
+} else {
+  alert("We couldn’t start checkout. Please refresh and try again.");
+
+  // restore button state
+  button.disabled = false;
+  button.innerText = "Continue to secure checkout";
+}
+
+  }
 </script>
 
 <footer style="margin-top:40px; font-size:14px;">

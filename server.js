@@ -154,7 +154,41 @@ app.get("/success", async (req, res) => {
 
     // TODO: grant access here (token, DB flag, etc)
 
-    res.send("Payment successful. Access granted.");
+        res.send(`
+      <!DOCTYPE html>
+      <html lang="en">
+        <head>
+          <meta charset="UTF-8" />
+          <title>Payment successful</title>
+          <style>
+            body {
+              font-family: system-ui, sans-serif;
+              max-width: 600px;
+              margin: 80px auto;
+              text-align: center;
+            }
+            .btn-primary {
+              display: inline-block;
+              margin-top: 24px;
+              padding: 12px 20px;
+              background: black;
+              color: white;
+              text-decoration: none;
+              border-radius: 6px;
+            }
+          </style>
+        </head>
+        <body>
+          <h2>✅ Payment successful</h2>
+          <p>Your payment method has been saved securely.</p>
+          <p>You now have access to your purchase.</p>
+
+          <a href="/dashboard" class="btn-primary">
+            Continue
+          </a>
+        </body>
+      </html>
+    `);
 
   } catch (err) {
     console.error("❌ Success handling failed:", err);
@@ -164,6 +198,38 @@ app.get("/success", async (req, res) => {
 
 app.get("/cancel", (req, res) => {
   res.send("Payment cancelled");
+  app.get("/cancel", (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <title>Payment not completed</title>
+        <style>
+          body {
+            font-family: system-ui, sans-serif;
+            max-width: 600px;
+            margin: 80px auto;
+            text-align: center;
+          }
+          a {
+            display: inline-block;
+            margin-top: 20px;
+            color: #000;
+            text-decoration: underline;
+          }
+        </style>
+      </head>
+      <body>
+        <h2>Payment not completed</h2>
+        <p>No charge was made.</p>
+
+        <a href="/checkout.html">Try again</a>
+      </body>
+    </html>
+  `);
+});
+
 });
 
 // =====================
