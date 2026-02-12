@@ -3,75 +3,75 @@
 <head>
   <meta charset="UTF-8" />
   <title>Stripe Checkout</title>
-
   <script src="https://js.stripe.com/v3/"></script>
 </head>
 
-</body>
-</html>
-
 <body>
+
   <h1>Choose a product</h1>
+
   <ul>
-  <li>🔒 Secure payment via Stripe</li>
-  <li>💳 Card saved for future access</li>
-  <li>⚡ Takes less than 30 seconds</li>
-</ul>
+    <li>🔒 Secure payment via Stripe</li>
+    <li>💳 Card saved for future access</li>
+    <li>⚡ Takes less than 30 seconds</li>
+  </ul>
 
-<label for="amount">Amount (USD)</label>
-<input 
-  type="number" 
-  id="amount" 
-  value="1" 
-  min="1" 
-  step="1"
-/>
+  <label for="amount">Amount (USD)</label>
+  <input 
+    type="number" 
+    id="amount" 
+    value="1" 
+    min="1" 
+    step="1"
+  />
 
-<button id="pay" onclick="pay()">Continue to secure checkout</button>
+  <button id="pay" onclick="pay()">
+    Continue to secure checkout
+  </button>
 
-<script>
+  <script>
+    async function pay() {
+      const amountInput = document.getElementById("amount");
 
-async function pay() {
-  const amountInput = document.getElementById("amount");
+      if (!amountInput) {
+        alert("Amount field not found.");
+        return;
+      }
 
-  if (!amountInput) {
-    alert("Amount field not found.");
-    return;
-  }
+      const amount = amountInput.value;
 
-  const amount = amountInput.value;
+      if (!amount || amount < 1) {
+        alert("Please enter a valid amount.");
+        return;
+      }
 
-  if (!amount || amount < 1) {
-    alert("Please enter a valid amount.");
-    return;
-  }
+      try {
+        const res = await fetch("/create-setup-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount })
+        });
 
-  try {
-    const res = await fetch("/create-setup-session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount })
-    });
+        const data = await res.json();
 
-    const data = await res.json();
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          alert("We couldn’t start checkout. Please refresh and try again.");
+        }
 
-    if (data.url) {
-      window.location.href = data.url;
-    } else {
-      alert("We couldn’t start checkout. Please refresh and try again.");
+      } catch (err) {
+        console.error("Checkout error:", err);
+        alert("We couldn’t start checkout. Please refresh and try again.");
+      }
     }
+  </script>
 
-  } catch (err) {
-    console.error("Checkout error:", err);
-    alert("We couldn’t start checkout. Please refresh and try again.");
-  }
-}
-</script>
+  <footer style="margin-top:40px; font-size:14px;">
+    <a href="/terms">Terms</a> |
+    <a href="/privacy">Privacy</a> |
+    <a href="/contact">Contact</a>
+  </footer>
 
-<footer style="margin-top:40px; font-size:14px;">
-  <a href="/terms">Terms</a> |
-  <a href="/privacy">Privacy</a> |
-  <a href="/contact">Contact</a>
-</footer>
 </body>
 </html>
