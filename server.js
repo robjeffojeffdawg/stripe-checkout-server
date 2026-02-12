@@ -1,8 +1,6 @@
 import express from "express";
 import Stripe from "stripe";
 import path from "path";
-import crypto from "crypto";
-import fs from "fs";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -92,14 +90,8 @@ if (!amount || amount < 1) {
   return res.status(400).json({ error: "Invalid amount" });
 }
 
-    // Get or create customer
-    let customerId = await getStripeCustomerIdFromDB(userId);
-
-    if (!customerId) {
-      const customer = await stripe.customers.create({ email });
-      customerId = customer.id;
-      await saveStripeCustomerIdToDB(userId, customerId);
-    }
+  const customer = await stripe.customers.create({ email });
+const customerId = customer.id;
 
     // Create Checkout Session (SETUP MODE)
     const session = await stripe.checkout.sessions.create({
