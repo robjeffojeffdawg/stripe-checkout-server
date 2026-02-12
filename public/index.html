@@ -18,36 +18,54 @@
   <li>⚡ Takes less than 30 seconds</li>
 </ul>
 
+<label for="amount">Amount (USD)</label>
+<input 
+  type="number" 
+  id="amount" 
+  value="1" 
+  min="1" 
+  step="1"
+/>
+
 <button id="pay" onclick="pay()">Continue to secure checkout</button>
 
 <script>
-  async function pay() {
-    const button = document.getElementById("pay");
 
-    // ✅ Loading state (THIS is the part you asked about)
-    button.disabled = true;
-    button.innerText = "Redirecting to secure checkout…";
+async function pay() {
+  const amountInput = document.getElementById("amount");
 
-    const amount = document.getElementById("amount").value;
+  if (!amountInput) {
+    alert("Amount field not found.");
+    return;
+  }
 
+  const amount = amountInput.value;
+
+  if (!amount || amount < 1) {
+    alert("Please enter a valid amount.");
+    return;
+  }
+
+  try {
     const res = await fetch("/create-setup-session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ amount })
     });
-const data = await res.json();
 
-if (data.url) {
-  window.location.href = data.url;
-} else {
-  alert("We couldn’t start checkout. Please refresh and try again.");
+    const data = await res.json();
 
-  // restore button state
-  button.disabled = false;
-  button.innerText = "Continue to secure checkout";
-}
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      alert("We couldn’t start checkout. Please refresh and try again.");
+    }
 
+  } catch (err) {
+    console.error("Checkout error:", err);
+    alert("We couldn’t start checkout. Please refresh and try again.");
   }
+}
 </script>
 
 <footer style="margin-top:40px; font-size:14px;">
