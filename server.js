@@ -5,7 +5,11 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+console.log("Checking customer in DB...");
+
 import { pool } from './db.js';
+
+console.log("Customer check complete");
 
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -79,10 +83,12 @@ async function savePaymentMethodToDB(userId, paymentMethodId) {
   );
 }
 
-app.post("/create-setup-session", async (req, res) => {
+app.post("/create-setup-session", async (req, res) =>{
   try {
     const userId = "unionpay_client_001";
     const email = "client@email.com";
+
+    console.log("➡️ create-setup-session hit");
 
   const amount = Number(req.body.amount);
 
