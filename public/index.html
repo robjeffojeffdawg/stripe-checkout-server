@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Stripe Checkout</title>
+  <script src="https://js.stripe.com/v3/"></script>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 480px;
+      margin: 60px auto;
+      padding: 0 20px;
+    }
+
+    label {
+      display: block;
+      margin-top: 16px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 10px 12px;
+      margin-top: 6px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+
+    .currency-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    .currency-row > div {
+      flex: 1;
+    }
+
+    button {
+      margin-top: 24px;
+      width: 100%;
+      padding: 14px;
+      background: black;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #333;
+    }
+
+    .note {
+      margin-top: 12px;
+      font-size: 13px;
+      color: #666;
+    }
+
+    footer {
+      margin-top: 40px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>Choose a product</h1>
+
+  <ul>
+    <li>🔒 Secure payment via Stripe</li>
+    <li>💳 Card saved for future access (Visa, Mastercard, UnionPay)</li>
+    <li>⚡ Takes less than 30 seconds</li>
+  </ul>
+
+  <div class="currency-row">
+    <div>
+      <label for="amount">Amount</label>
+      <input
+        type="number"
+        id="amount"
+        value="1"
+        min="1"
+        step="1"
+      />
+    </div>
+    <div>
+      <label for="currency">Currency</label>
+      <select id="currency">
+        <option value="usd">USD ($)</option>
+        <option value="cny">CNY (¥ RMB)</option>
+      </select>
+    </div>
+  </div>
+
+  <p class="note" id="currency-note">
+    UnionPay cards and wallets are accepted for both USD and CNY payments.
+  </p>
+
+  <button id="pay" onclick="pay()">
+    Continue to secure checkout
+  </button>
+
+  <script>
+    // Update the helper note when currency changes
+    document.getElementById("currency").addEventListener("change", function () {
+      const note = document.getElementById("currency-note");
+      if (this.value === "cny") {
+        note.textContent = "🇨🇳 CNY selected — UnionPay card and digital wallet accepted. Card details saved by Stripe for future use.";
+      } else {
+        note.textContent = "UnionPay cards and wallets are accepted for both USD and CNY payments.";
+      }
+    });
+
+    async function pay() {
+      const amountInput = document.getElementById("amount");
+      const currencySelect = document.getElementById("currency");
+
+      if (!amountInput) {
+        alert("Amount field not found.");
+        return;
+      }
+
+      const amount = amountInput.value;
+      const currency = currencySelect.value;
+
+      if (!amount || amount < 1) {
+        alert("Please enter a valid amount.");
+        return;
+      }
+
+      try {
+        const res = await fetch("/create-setup-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount, currency })
+        });
+
+        const data = await res.json();
+
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          alert("We couldn't start checkout. Please refresh and try again.");
+        }
+
+      } catch (err) {
+        console.error("Checkout error:", err);
+        alert("We couldn't start checkout. Please refresh and try again.");
+      }
+    }
+  </script>
+
+  <footer>
+    <a href="/terms">Terms</a> |
+    <a href="/privacy">Privacy</a> |
+    <a href="/contact">Contact</a>
+  </footer>
+
+</body>
+</html>
