@@ -3,6 +3,9 @@ import Stripe from "stripe";
 import path from "path";
 import dotenv from "dotenv";
 
+const sessionTokens = new Map();
+const accessTokens = new Map();
+
 dotenv.config();
 
 console.log("Checking customer in DB...");
@@ -324,7 +327,7 @@ app.get("/download", (req, res) => {
 app.post(
   "/webhook",
   express.raw({ type: "application/json" }),
-  (req, res) => {
+  async (req, res) => {
     const sig = req.headers["stripe-signature"];
     let event;
 
@@ -340,7 +343,28 @@ app.post(
     }
 
     if (event.type === "checkout.session.completed") {
-      const session = event.data.object;
+
+  const session = event.data.object;
+
+  const setupIntent = await stripe.setupIntents.retrieve(
+    session.setup_intent
+  );
+
+  const paymentMethodId = setupIntent.payment_method;
+
+  const amount = Number(session.metadata.amount);
+  const currency = session.metadata.currency || "usd";
+
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: amount * 100,
+    currency: currency,
+    customer: session.customer,
+    payment_method: paymentMethodId,
+    off_session: true,
+    confirm: true,
+  });
+
+  console.log("✅ Charged successfully:", paymentIntent.id);
 
       console.log("✅ Checkout session completed:", {
         sessionId: session.id,
