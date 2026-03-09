@@ -94,9 +94,6 @@ app.post("/create-setup-session", async (req, res) => {
 
     console.log("➡️ create-setup-session hit");
 
-    const amount = Number(req.body.amount);
-    const currency = req.body.currency === "cny" ? "cny" : "usd";
-
     if (!amount || amount < 1) {
       return res.status(400).json({ error: "Invalid amount" });
     }
