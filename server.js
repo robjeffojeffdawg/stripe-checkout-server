@@ -62,10 +62,7 @@ app.post("/create-setup-session", async (req, res) => {
     console.log("➡️ create-setup-session hit");
 
     const amount = Number(req.body.amount);
-    const currency = (req.body.currency || "usd").toLowerCase()
-    if (!["usd", "cny"].includes(currency)) {
-  return res.status(400).json({ error: "Unsupported currency" });
-}
+    const currency = req.body.currency === "cny" ? "cny" : "usd";
 
     if (!amount || amount < 1) {
       return res.status(400).json({ error: "Invalid amount" });
@@ -76,7 +73,7 @@ app.post("/create-setup-session", async (req, res) => {
     const session = await stripe.checkout.sessions.create({
       mode: "setup",
       customer: customer.id,
-      payment_method_types: ["card", "unionpay"],
+      payment_method_types: ["card"],
       metadata: {
         amount: amount,
         currency: currency,
@@ -96,8 +93,8 @@ app.post("/create-setup-session", async (req, res) => {
 // =====================
 // SUCCESS — CHARGE
 // =====================
-app.get("/success", async (req, res) => 
-  {try {
+app.get("/success", async (req, res) => {
+  try {
     const session = await stripe.checkout.sessions.retrieve(
       req.query.session_id,
       { expand: ["setup_intent"] }
@@ -233,15 +230,8 @@ app.get("/access", (req, res) => {
 app.get("/download", (req, res) => {
   const { token, file } = req.query
 
-  const tokenData = sessionTokens.get(token);
-
-  if (!token || !tokenData) {
-    return res.status(404).send("❌ Invalid access token.");
-  }
-
-  if (Date.now() > tokenData.expires) {
-    sessionTokens.delete(token);
-    return res.status(403).send("❌ Token expired.");
+  if (!token || !sessionTokens.has(token)) {
+    return res.status(404).send("❌ Invalid or expired access token.")
   }
 
   const filePath = path.join(__dirname, "protected", file)
