@@ -2,20 +2,13 @@ import express from "express";
 import Stripe from "stripe";
 import path from "path";
 import dotenv from "dotenv";
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
 const sessionTokens = new Map();
 const accessTokens = new Map();
 
 dotenv.config();
-
-console.log("Checking customer in DB...");
-
-import { pool } from './db.js';
-
-console.log("Customer check complete");
-
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -36,22 +29,19 @@ if (
 console.log("✅ Stripe keys loaded")
 
 // =====================
-// NORMAL MIDDLEWARE
+// MIDDLEWARE
 // =====================
 app.use(express.json())
 app.use(express.static("public"))
 
-// Terms
 app.get("/terms", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "terms.html"));
 });
 
-// Privacy
 app.get("/privacy", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "privacy.html"));
 });
 
-// Contact
 app.get("/contact", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "contact.html"));
 });
@@ -62,67 +52,32 @@ app.get('/config', (req, res) => {
   });
 });
 
-async function getStripeCustomerIdFromDB(userId) {
-  const result = await pool.query(
-    'SELECT stripe_customer_id FROM users WHERE id = $1',
-    [userId]
-  );
-  return result.rows[0]?.stripe_customer_id || null;
-}
-
-async function saveStripeCustomerIdToDB(userId, customerId) {
-  await pool.query(
-    'UPDATE users SET stripe_customer_id = $1 WHERE id = $2',
-    [customerId, userId]
-  );
-}
-
-async function savePaymentMethodToDB(userId, paymentMethodId) {
-  await pool.query(
-    'UPDATE users SET stripe_payment_method_id = $1 WHERE id = $2',
-    [paymentMethodId, userId]
-  );
-}
-
 // =====================
 // CREATE SETUP SESSION
 // =====================
 app.post("/create-setup-session", async (req, res) => {
   try {
-    const userId = "unionpay_client_001";
     const email = "client@email.com";
 
     console.log("➡️ create-setup-session hit");
+
+    const amount = Number(req.body.amount);
+    const currency = req.body.currency === "cny" ? "cny" : "usd";
 
     if (!amount || amount < 1) {
       return res.status(400).json({ error: "Invalid amount" });
     }
 
     const customer = await stripe.customers.create({ email });
-    const customerId = customer.id;
 
-    // UnionPay note:
-    // - "unionpay" covers both physical UnionPay cards AND UnionPay digital wallets.
-    // - SetupIntent mode saves the card details in Stripe for future off-session charges,
-    //   which works for UnionPay cards that support it (most do via Stripe's network).
-    // - CNY requires a Stripe account with CNY enabled. If your account is USD-only,
-    //   use currency: "usd" — UnionPay cards still work, just billed in USD.
     const session = await stripe.checkout.sessions.create({
       mode: "setup",
-      customer: customerId,
-
-      // Both card (Visa/Mastercard) and UnionPay (card + digital wallet) are enabled.
-      // Stripe will automatically show UnionPay as an option for Chinese cardholders.
+      customer: customer.id,
       payment_method_types: ["card", "unionpay"],
-
-      // Pass currency so the downstream PaymentIntent uses the right one.
-      // Note: Stripe SetupIntent mode doesn't take a currency, but we store it
-      // in metadata so the charge step uses it correctly.
       metadata: {
         amount: amount,
         currency: currency,
       },
-
       success_url: `${process.env.BASE_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.BASE_URL}/cancel`,
     });
@@ -148,22 +103,17 @@ app.get("/success", async (req, res) => {
     const setupIntent = session.setup_intent;
     const paymentMethodId = setupIntent.payment_method;
     const amount = Number(session.metadata.amount);
-    const currency = session.metadata.currency || "usd" // or "cny"
+    const currency = session.metadata.currency || "usd";
 
     if (!amount || amount < 1) {
       return res.status(400).send("Invalid amount");
     }
 
-    // Retrieve the payment method so we can check its type
     const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
-    const pmType = paymentMethod.type; // "card" or "unionpay"
+    console.log(`💳 Payment method type: ${paymentMethod.type}, currency: ${currency}`);
 
-    console.log(`💳 Payment method type: ${pmType}, currency: ${currency}`);
-
-    // UnionPay cards ARE supported for off-session charges via Stripe when saved
-    // through a SetupIntent. We confirm off_session the same way as regular cards.
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: amount * 100, // Stripe uses smallest currency unit (fen for CNY, cents for USD)
+      amount: amount * 100,
       currency: currency,
       customer: session.customer,
       payment_method: paymentMethodId,
@@ -182,21 +132,8 @@ app.get("/success", async (req, res) => {
           <meta charset="UTF-8" />
           <title>Payment successful</title>
           <style>
-            body {
-              font-family: system-ui, sans-serif;
-              max-width: 600px;
-              margin: 80px auto;
-              text-align: center;
-            }
-            .btn-primary {
-              display: inline-block;
-              margin-top: 24px;
-              padding: 12px 20px;
-              background: black;
-              color: white;
-              text-decoration: none;
-              border-radius: 6px;
-            }
+            body { font-family: system-ui, sans-serif; max-width: 600px; margin: 80px auto; text-align: center; }
+            .btn-primary { display: inline-block; margin-top: 24px; padding: 12px 20px; background: black; color: white; text-decoration: none; border-radius: 6px; }
           </style>
         </head>
         <body>
@@ -211,8 +148,6 @@ app.get("/success", async (req, res) => {
   } catch (err) {
     console.error("❌ Success handling failed:", err);
 
-    // Handle the specific case where a UnionPay card cannot be charged off-session
-    // (rare, but possible if the card issuer blocks it)
     if (err.code === "authentication_required" || err.code === "card_declined") {
       return res.status(402).send(`
         <!DOCTYPE html>
@@ -243,18 +178,8 @@ app.get("/cancel", (req, res) => {
         <meta charset="UTF-8" />
         <title>Payment not completed</title>
         <style>
-          body {
-            font-family: system-ui, sans-serif;
-            max-width: 600px;
-            margin: 80px auto;
-            text-align: center;
-          }
-          a {
-            display: inline-block;
-            margin-top: 20px;
-            color: #000;
-            text-decoration: underline;
-          }
+          body { font-family: system-ui, sans-serif; max-width: 600px; margin: 80px auto; text-align: center; }
+          a { display: inline-block; margin-top: 20px; color: #000; text-decoration: underline; }
         </style>
       </head>
       <body>
@@ -340,34 +265,27 @@ app.post(
     }
 
     if (event.type === "checkout.session.completed") {
+      const session = event.data.object;
 
-  const session = event.data.object;
+      try {
+        const setupIntent = await stripe.setupIntents.retrieve(session.setup_intent);
+        const paymentMethodId = setupIntent.payment_method;
+        const amount = Number(session.metadata.amount);
+        const currency = session.metadata.currency || "usd";
 
-  const setupIntent = await stripe.setupIntents.retrieve(
-    session.setup_intent
-  );
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: amount * 100,
+          currency: currency,
+          customer: session.customer,
+          payment_method: paymentMethodId,
+          off_session: true,
+          confirm: true,
+        });
 
-  const paymentMethodId = setupIntent.payment_method;
-
-  const amount = Number(session.metadata.amount);
-  const currency = session.metadata.currency || "usd";
-
-  const paymentIntent = await stripe.paymentIntents.create({
-    amount: amount * 100,
-    currency: currency,
-    customer: session.customer,
-    payment_method: paymentMethodId,
-    off_session: true,
-    confirm: true,
-  });
-
-  console.log("✅ Charged successfully:", paymentIntent.id);
-
-      console.log("✅ Checkout session completed:", {
-        sessionId: session.id,
-        customerId: session.customer,
-        setupIntent: session.setup_intent,
-      });
+        console.log("✅ Webhook charge successful:", paymentIntent.id);
+      } catch (err) {
+        console.error("❌ Webhook charge failed:", err.message);
+      }
     }
 
     res.json({ received: true });
