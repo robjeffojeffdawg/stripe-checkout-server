@@ -148,7 +148,7 @@ app.get("/success", async (req, res) => {
     const setupIntent = session.setup_intent;
     const paymentMethodId = setupIntent.payment_method;
     const amount = Number(session.metadata.amount);
-    const currency = session.metadata.currency || "usd";
+    const currency = session.metadata.currency || "usd" // or "cny"
 
     if (!amount || amount < 1) {
       return res.status(400).send("Invalid amount");
