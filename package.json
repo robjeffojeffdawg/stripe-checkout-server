@@ -1,4 +1,7 @@
 {
+    "engines": {
+  "node": ">=20.0.0 <22.0.0"
+},
     "type": "module",
     "name": "stripe-checkout-server",
     "version": "1.0.0",
